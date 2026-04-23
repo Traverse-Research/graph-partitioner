@@ -16,45 +16,45 @@ use std::result::Result as StdResult;
 
 #[derive(Debug, PartialEq)]
 pub struct Graph<'a> {
-    ncon: Idx,
-    nparts: Idx,
+    num_constraints: Idx,
+    num_parts: Idx,
     xadj: &'a [Idx],
-    adjncy: &'a [Idx],
-    vwgt: Option<&'a [Idx]>,
-    vsize: Option<&'a [Idx]>,
-    adjwgt: Option<&'a [Idx]>,
-    tpwgts: Option<&'a [Real]>,
+    adjacency: &'a [Idx],
+    vertex_weights: Option<&'a [Idx]>,
+    vertex_sizes: Option<&'a [Idx]>,
+    edge_weights: Option<&'a [Idx]>,
+    target_part_weights: Option<&'a [Real]>,
     ubvec: Option<&'a [Real]>,
     options: [Idx; NOPTIONS],
 }
 
 impl<'a> Graph<'a> {
     pub fn new(
-        ncon: Idx,
-        nparts: Idx,
+        num_constraints: Idx,
+        num_parts: Idx,
         xadj: &'a [Idx],
-        adjncy: &'a [Idx],
+        adjacency: &'a [Idx],
     ) -> StdResult<Graph<'a>, NewGraphError> {
-        if ncon < 1 {
+        if num_constraints < 1 {
             return Err(NewGraphError::NoConstraints);
         }
-        if nparts < 1 {
+        if num_parts < 1 {
             return Err(NewGraphError::NoParts);
         }
         if xadj.len() < 1 {
             return Err(NewGraphError::msg("xadj must have at least one element"));
         }
 
-        let nvtxs = xadj.len() - 1;
-        if Idx::try_from(nvtxs).is_err() {
+        let num_vertices = xadj.len() - 1;
+        if Idx::try_from(num_vertices).is_err() {
             return Err(NewGraphError::TooLarge);
         }
-        if Idx::try_from(adjncy.len()).is_err() {
+        if Idx::try_from(adjacency.len()).is_err() {
             return Err(NewGraphError::TooLarge);
         }
 
         // Validate xadj is non-decreasing and in bounds
-        for i in 0..nvtxs {
+        for i in 0..num_vertices {
             if xadj[i] > xadj[i + 1] {
                 return Err(NewGraphError::msg("xadj must be non-decreasing"));
             }
@@ -62,71 +62,71 @@ impl<'a> Graph<'a> {
         if xadj[0] != 0 {
             return Err(NewGraphError::msg("xadj[0] must be 0"));
         }
-        let last = xadj[nvtxs] as usize;
-        if last != adjncy.len() {
+        let last = xadj[num_vertices] as usize;
+        if last != adjacency.len() {
             return Err(NewGraphError::msg(
-                "xadj[n] must equal adjncy.len()",
+                "xadj[n] must equal adjacency.len()",
             ));
         }
 
-        // Validate adjncy values
-        for &adj in adjncy {
-            if adj < 0 || adj >= nvtxs as Idx {
-                return Err(NewGraphError::msg("adjncy values out of range"));
+        // Validate adjacency values
+        for &adj in adjacency {
+            if adj < 0 || adj >= num_vertices as Idx {
+                return Err(NewGraphError::msg("adjacency values out of range"));
             }
         }
 
         Ok(Graph {
-            ncon,
-            nparts,
+            num_constraints,
+            num_parts,
             xadj,
-            adjncy,
-            vwgt: None,
-            vsize: None,
-            adjwgt: None,
-            tpwgts: None,
+            adjacency,
+            vertex_weights: None,
+            vertex_sizes: None,
+            edge_weights: None,
+            target_part_weights: None,
             ubvec: None,
             options: [-1; NOPTIONS],
         })
     }
 
     pub unsafe fn new_unchecked(
-        ncon: Idx,
-        nparts: Idx,
+        num_constraints: Idx,
+        num_parts: Idx,
         xadj: &'a [Idx],
-        adjncy: &'a [Idx],
+        adjacency: &'a [Idx],
     ) -> Graph<'a> {
         Graph {
-            ncon,
-            nparts,
+            num_constraints,
+            num_parts,
             xadj,
-            adjncy,
-            vwgt: None,
-            vsize: None,
-            adjwgt: None,
-            tpwgts: None,
+            adjacency,
+            vertex_weights: None,
+            vertex_sizes: None,
+            edge_weights: None,
+            target_part_weights: None,
             ubvec: None,
             options: [-1; NOPTIONS],
         }
     }
 
-    pub fn set_vwgt(mut self, vwgt: &'a [Idx]) -> Graph<'a> {
-        self.vwgt = Some(vwgt);
+    pub fn set_vertex_weights(mut self, vertex_weights: &'a [Idx]) -> Graph<'a> {
+        self.vertex_weights = Some(vertex_weights);
         self
     }
 
-    pub fn set_vsize(mut self, vsize: &'a [Idx]) -> Graph<'a> {
-        self.vsize = Some(vsize);
+    pub fn set_vertex_sizes(mut self, vertex_sizes: &'a [Idx]) -> Graph<'a> {
+        self.vertex_sizes = Some(vertex_sizes);
         self
     }
 
-    pub fn set_adjwgt(mut self, adjwgt: &'a [Idx]) -> Graph<'a> {
-        self.adjwgt = Some(adjwgt);
+    pub fn set_edge_weights(mut self, edge_weights: &'a [Idx]) -> Graph<'a> {
+        self.edge_weights = Some(edge_weights);
         self
     }
 
-    pub fn set_tpwgts(mut self, tpwgts: &'a [Real]) -> Graph<'a> {
-        self.tpwgts = Some(tpwgts);
+    pub fn set_target_part_weights(mut self, target_part_weights: &'a [Real]) -> Graph<'a> {
+        self.target_part_weights = Some(target_part_weights);
         self
     }
 
@@ -146,9 +146,9 @@ impl<'a> Graph<'a> {
     }
 
     pub fn part_kway(self, part: &mut [Idx]) -> Result<Idx> {
-        let nvtxs = self.xadj.len() - 1;
-        if self.nparts == 1 {
-            for p in part.iter_mut().take(nvtxs) {
+        let num_vertices = self.xadj.len() - 1;
+        if self.num_parts == 1 {
+            for p in part.iter_mut().take(num_vertices) {
                 *p = 0;
             }
             return Ok(0);
@@ -160,101 +160,101 @@ impl<'a> Graph<'a> {
 #[derive(Debug, PartialEq)]
 pub struct Mesh<'a> {
     nn: Idx,
-    nparts: Idx,
-    ncommon: Idx,
-    eptr: &'a [Idx],
-    eind: &'a [Idx],
-    vwgt: Option<&'a [Idx]>,
-    vsize: Option<&'a [Idx]>,
-    tpwgts: Option<&'a [Real]>,
+    num_parts: Idx,
+    min_common_nodes: Idx,
+    element_offsets: &'a [Idx],
+    element_indices: &'a [Idx],
+    vertex_weights: Option<&'a [Idx]>,
+    vertex_sizes: Option<&'a [Idx]>,
+    target_part_weights: Option<&'a [Real]>,
     options: [Idx; NOPTIONS],
 }
 
 impl<'a> Mesh<'a> {
     pub fn new(
-        nparts: Idx,
-        eptr: &'a [Idx],
-        eind: &'a [Idx],
+        num_parts: Idx,
+        element_offsets: &'a [Idx],
+        element_indices: &'a [Idx],
     ) -> StdResult<Mesh<'a>, NewMeshError> {
-        if nparts < 1 {
+        if num_parts < 1 {
             return Err(NewMeshError::NoParts);
         }
-        if eptr.len() < 1 {
-            return Err(NewMeshError::msg("eptr must have at least one element"));
+        if element_offsets.len() < 1 {
+            return Err(NewMeshError::msg("element_offsets must have at least one element"));
         }
 
-        let ne = eptr.len() - 1;
+        let ne = element_offsets.len() - 1;
         if Idx::try_from(ne).is_err() {
             return Err(NewMeshError::TooLarge);
         }
-        if Idx::try_from(eind.len()).is_err() {
+        if Idx::try_from(element_indices.len()).is_err() {
             return Err(NewMeshError::TooLarge);
         }
 
-        // Validate eptr
-        if eptr[0] != 0 {
-            return Err(NewMeshError::msg("eptr[0] must be 0"));
+        // Validate element_offsets
+        if element_offsets[0] != 0 {
+            return Err(NewMeshError::msg("element_offsets[0] must be 0"));
         }
         for i in 0..ne {
-            if eptr[i] > eptr[i + 1] {
-                return Err(NewMeshError::msg("eptr must be non-decreasing"));
+            if element_offsets[i] > element_offsets[i + 1] {
+                return Err(NewMeshError::msg("element_offsets must be non-decreasing"));
             }
         }
-        let last = eptr[ne] as usize;
-        if last != eind.len() {
-            return Err(NewMeshError::msg("eptr[ne] must equal eind.len()"));
+        let last = element_offsets[ne] as usize;
+        if last != element_indices.len() {
+            return Err(NewMeshError::msg("element_offsets[ne] must equal element_indices.len()"));
         }
 
         // Compute nn (max node index + 1)
-        let nn = eind.iter().copied().max().map(|m| m + 1).unwrap_or(0);
+        let nn = element_indices.iter().copied().max().map(|m| m + 1).unwrap_or(0);
         if nn < 0 {
-            return Err(NewMeshError::msg("negative node indices in eind"));
+            return Err(NewMeshError::msg("negative node indices in element_indices"));
         }
 
         Ok(Mesh {
             nn,
-            nparts,
-            ncommon: 1,
-            eptr,
-            eind,
-            vwgt: None,
-            vsize: None,
-            tpwgts: None,
+            num_parts,
+            min_common_nodes: 1,
+            element_offsets,
+            element_indices,
+            vertex_weights: None,
+            vertex_sizes: None,
+            target_part_weights: None,
             options: [-1; NOPTIONS],
         })
     }
 
     pub unsafe fn new_unchecked(
         nn: Idx,
-        nparts: Idx,
-        eptr: &'a [Idx],
-        eind: &'a [Idx],
+        num_parts: Idx,
+        element_offsets: &'a [Idx],
+        element_indices: &'a [Idx],
     ) -> Mesh<'a> {
         Mesh {
             nn,
-            nparts,
-            ncommon: 1,
-            eptr,
-            eind,
-            vwgt: None,
-            vsize: None,
-            tpwgts: None,
+            num_parts,
+            min_common_nodes: 1,
+            element_offsets,
+            element_indices,
+            vertex_weights: None,
+            vertex_sizes: None,
+            target_part_weights: None,
             options: [-1; NOPTIONS],
         }
     }
 
-    pub fn set_vwgt(mut self, vwgt: &'a [Idx]) -> Mesh<'a> {
-        self.vwgt = Some(vwgt);
+    pub fn set_vertex_weights(mut self, vertex_weights: &'a [Idx]) -> Mesh<'a> {
+        self.vertex_weights = Some(vertex_weights);
         self
     }
 
-    pub fn set_vsize(mut self, vsize: &'a [Idx]) -> Mesh<'a> {
-        self.vsize = Some(vsize);
+    pub fn set_vertex_sizes(mut self, vertex_sizes: &'a [Idx]) -> Mesh<'a> {
+        self.vertex_sizes = Some(vertex_sizes);
         self
     }
 
-    pub fn set_tpwgts(mut self, tpwgts: &'a [Real]) -> Mesh<'a> {
-        self.tpwgts = Some(tpwgts);
+    pub fn set_target_part_weights(mut self, target_part_weights: &'a [Real]) -> Mesh<'a> {
+        self.target_part_weights = Some(target_part_weights);
         self
     }
 
@@ -269,8 +269,8 @@ impl<'a> Mesh<'a> {
     }
 
     pub fn part_dual(mut self, epart: &mut [Idx], npart: &mut [Idx]) -> Result<Idx> {
-        let ne = self.eptr.len() - 1;
-        if self.nparts == 1 {
+        let ne = self.element_offsets.len() - 1;
+        if self.num_parts == 1 {
             for p in epart.iter_mut().take(ne) {
                 *p = 0;
             }

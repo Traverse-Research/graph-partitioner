@@ -34,13 +34,13 @@ pub fn rargmax(n: usize, arr: &[Real]) -> usize {
 
 #[allow(dead_code)]
 /// Compute the edge-cut of a partitioning.
-pub fn compute_cut(graph: &GraphData, where_: &[Idx]) -> Idx {
-    let nvtxs = graph.nvtxs as usize;
+pub fn compute_cut(graph: &GraphData, partition: &[Idx]) -> Idx {
+    let num_vertices = graph.num_vertices as usize;
     let mut cut = 0;
-    for i in 0..nvtxs {
+    for i in 0..num_vertices {
         for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-            if where_[i] != where_[graph.adjncy[k] as usize] {
-                cut += graph.adjwgt[k];
+            if partition[i] != partition[graph.adjacency[k] as usize] {
+                cut += graph.edge_weights[k];
             }
         }
     }
@@ -49,19 +49,19 @@ pub fn compute_cut(graph: &GraphData, where_: &[Idx]) -> Idx {
 
 #[allow(dead_code)]
 /// Compute the total communication volume of a partitioning.
-pub fn compute_volume(graph: &GraphData, where_: &[Idx]) -> Idx {
-    let nvtxs = graph.nvtxs as usize;
-    let nparts = where_.iter().copied().max().unwrap_or(0) + 1;
+pub fn compute_volume(graph: &GraphData, partition: &[Idx]) -> Idx {
+    let num_vertices = graph.num_vertices as usize;
+    let nparts = partition.iter().copied().max().unwrap_or(0) + 1;
     let mut vol = 0;
 
     let mut marker = vec![false; nparts as usize];
 
-    for i in 0..nvtxs {
-        let me = where_[i] as usize;
+    for i in 0..num_vertices {
+        let me = partition[i] as usize;
         let mut cnt = 0;
 
         for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-            let other = where_[graph.adjncy[k] as usize] as usize;
+            let other = partition[graph.adjacency[k] as usize] as usize;
             if other != me && !marker[other] {
                 marker[other] = true;
                 cnt += 1;
@@ -70,11 +70,11 @@ pub fn compute_volume(graph: &GraphData, where_: &[Idx]) -> Idx {
 
         // Clean up marker
         for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-            marker[where_[graph.adjncy[k] as usize] as usize] = false;
+            marker[partition[graph.adjacency[k] as usize] as usize] = false;
         }
 
         if cnt > 0 {
-            vol += graph.vsize[i] * cnt as Idx;
+            vol += graph.vertex_sizes[i] * cnt as Idx;
         }
     }
 
@@ -113,29 +113,29 @@ pub fn bucket_sort_keys_inc(n: usize, max: Idx, keys: &[Idx], tperm: &mut [Idx])
 
 #[allow(dead_code)]
 /// Compute partition weights.
-pub fn compute_partition_weights(graph: &GraphData, where_: &[Idx], nparts: Idx) -> Vec<Idx> {
-    let ncon = graph.ncon as usize;
-    let mut pwgts = vec![0 as Idx; nparts as usize * ncon];
-    for i in 0..graph.nvtxs as usize {
-        let p = where_[i] as usize;
+pub fn compute_partition_weights(graph: &GraphData, partition: &[Idx], nparts: Idx) -> Vec<Idx> {
+    let ncon = graph.num_constraints as usize;
+    let mut part_weights = vec![0 as Idx; nparts as usize * ncon];
+    for i in 0..graph.num_vertices as usize {
+        let p = partition[i] as usize;
         for j in 0..ncon {
-            pwgts[p * ncon + j] += graph.vwgt[i * ncon + j];
+            part_weights[p * ncon + j] += graph.vertex_weights[i * ncon + j];
         }
     }
-    pwgts
+    part_weights
 }
 
 #[allow(dead_code)]
 /// Check if a 2-way partition is balanced.
 pub fn is_balanced_2way(
-    tvwgt_j: Idx,
+    total_vertex_weight_j: Idx,
     pwgt0_j: Idx,
     pwgt1_j: Idx,
     target_ratio: Real,
     ubfactor: Real,
 ) -> bool {
-    let target0 = (tvwgt_j as Real * target_ratio) as Idx;
-    let target1 = tvwgt_j - target0;
+    let target0 = (total_vertex_weight_j as Real * target_ratio) as Idx;
+    let target1 = total_vertex_weight_j - target0;
     let ub = ubfactor;
 
     pwgt0_j as Real <= ub * target0 as Real && pwgt1_j as Real <= ub * target1 as Real

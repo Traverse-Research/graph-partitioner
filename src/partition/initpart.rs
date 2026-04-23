@@ -1,63 +1,63 @@
 use crate::types::{Idx, Real};
-use crate::ctrl::Ctrl;
+use crate::ctrl::Control;
 use crate::graph::GraphData;
 
 /// Initialize a 2-way partition on the coarsest graph. Tries niparts attempts.
-pub fn init_2way_partition(ctrl: &mut Ctrl, graph: &mut GraphData, tpwgts: &[Real], niparts: Idx) {
+pub fn init_2way_partition(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
     graph.alloc_2way();
     let mut bestcut = Idx::MAX;
-    let mut bestwhere = vec![0 as Idx; graph.nvtxs as usize];
+    let mut bestwhere = vec![0 as Idx; graph.num_vertices as usize];
 
     for _inbfs in 0..niparts {
-        if ctrl.iptype == 1 {
-            random_bisection(ctrl, graph, tpwgts);
+        if ctrl.init_part_type == 1 {
+            random_bisection(ctrl, graph, target_part_weights);
         } else {
-            grow_bisection(ctrl, graph, tpwgts);
+            grow_bisection(ctrl, graph, target_part_weights);
         }
 
         compute_2way_partition_params(ctrl, graph);
-        super::balance::balance_2way(ctrl, graph, tpwgts);
-        super::fm::fm_2way_cut_refine(ctrl, graph, tpwgts, ctrl.niter);
+        super::balance::balance_2way(ctrl, graph, target_part_weights);
+        super::fm::fm_2way_cut_refine(ctrl, graph, target_part_weights, ctrl.num_iter);
 
-        if graph.mincut < bestcut {
-            bestcut = graph.mincut;
-            bestwhere.copy_from_slice(&graph.where_);
+        if graph.edge_cut < bestcut {
+            bestcut = graph.edge_cut;
+            bestwhere.copy_from_slice(&graph.partition);
             if bestcut == 0 {
                 break;
             }
         }
     }
 
-    graph.where_.copy_from_slice(&bestwhere);
+    graph.partition.copy_from_slice(&bestwhere);
     compute_2way_partition_params(ctrl, graph);
 }
 
 /// GrowBisection: BFS from random seed, growing partition 0.
-fn grow_bisection(ctrl: &mut Ctrl, graph: &mut GraphData, tpwgts: &[Real]) {
-    let nvtxs = graph.nvtxs as usize;
-    let ncon = graph.ncon as usize;
+fn grow_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real]) {
+    let num_vertices = graph.num_vertices as usize;
+    let ncon = graph.num_constraints as usize;
 
     // Target weights for partition 1
-    let onemaxpwgt = (ctrl.ubfactors[0] * graph.tvwgt[0] as Real * tpwgts[ncon]) as Idx;
-    let oneminpwgt = ((1.0 / ctrl.ubfactors[0]) * graph.tvwgt[0] as Real * tpwgts[ncon]) as Idx;
+    let max_target_weight = (ctrl.imbalance_tols[0] * graph.total_vertex_weight[0] as Real * target_part_weights[ncon]) as Idx;
+    let min_target_weight = ((1.0 / ctrl.imbalance_tols[0]) * graph.total_vertex_weight[0] as Real * target_part_weights[ncon]) as Idx;
 
     // Initialize all to partition 1
-    for i in 0..nvtxs {
-        graph.where_[i] = 1;
+    for i in 0..num_vertices {
+        graph.partition[i] = 1;
     }
 
-    let mut touched = vec![0u8; nvtxs];
-    let mut queue = vec![0usize; nvtxs];
-    let mut pwgts = [0 as Idx; 2];
-    pwgts[1] = graph.tvwgt[0];
+    let mut touched = vec![0u8; num_vertices];
+    let mut queue = vec![0usize; num_vertices];
+    let mut part_weights = [0 as Idx; 2];
+    part_weights[1] = graph.total_vertex_weight[0];
 
     // Pick random seed
-    let start = ctrl.rng.rand_in_range(graph.nvtxs) as usize;
+    let start = ctrl.rng.rand_in_range(graph.num_vertices) as usize;
     queue[0] = start;
     touched[start] = 1;
     let mut first = 0usize;
     let mut last = 1usize;
-    let mut nleft = nvtxs - 1;
+    let mut nleft = num_vertices - 1;
     let mut drain = false;
 
     loop {
@@ -68,7 +68,7 @@ fn grow_bisection(ctrl: &mut Ctrl, graph: &mut GraphData, tpwgts: &[Real]) {
             // Find random untouched vertex
             let k = ctrl.rng.rand_in_range(nleft as Idx) as usize;
             let mut cnt = 0;
-            for i in 0..nvtxs {
+            for i in 0..num_vertices {
                 if touched[i] == 0 {
                     if cnt == k {
                         queue[0] = i;
@@ -87,17 +87,17 @@ fn grow_bisection(ctrl: &mut Ctrl, graph: &mut GraphData, tpwgts: &[Real]) {
         first += 1;
 
         // Minimum weight guard
-        if pwgts[0] > 0 && pwgts[1] - graph.vwgt[i] < oneminpwgt {
+        if part_weights[0] > 0 && part_weights[1] - graph.vertex_weights[i] < min_target_weight {
             drain = true;
             continue;
         }
 
         // Move to partition 0
-        graph.where_[i] = 0;
-        pwgts[0] += graph.vwgt[i];
-        pwgts[1] -= graph.vwgt[i];
+        graph.partition[i] = 0;
+        part_weights[0] += graph.vertex_weights[i];
+        part_weights[1] -= graph.vertex_weights[i];
 
-        if pwgts[1] <= onemaxpwgt {
+        if part_weights[1] <= max_target_weight {
             break;
         }
 
@@ -105,7 +105,7 @@ fn grow_bisection(ctrl: &mut Ctrl, graph: &mut GraphData, tpwgts: &[Real]) {
 
         // Expand BFS
         for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-            let j = graph.adjncy[k] as usize;
+            let j = graph.adjacency[k] as usize;
             if touched[j] == 0 {
                 touched[j] = 1;
                 queue[last] = j;
@@ -116,86 +116,86 @@ fn grow_bisection(ctrl: &mut Ctrl, graph: &mut GraphData, tpwgts: &[Real]) {
     }
 
     // Degenerate cases
-    if pwgts[1] == 0 {
-        let v = ctrl.rng.rand_in_range(graph.nvtxs) as usize;
-        graph.where_[v] = 1;
+    if part_weights[1] == 0 {
+        let v = ctrl.rng.rand_in_range(graph.num_vertices) as usize;
+        graph.partition[v] = 1;
     }
-    if pwgts[0] == 0 {
-        let v = ctrl.rng.rand_in_range(graph.nvtxs) as usize;
-        graph.where_[v] = 0;
+    if part_weights[0] == 0 {
+        let v = ctrl.rng.rand_in_range(graph.num_vertices) as usize;
+        graph.partition[v] = 0;
     }
 }
 
 /// RandomBisection: randomly assign vertices to partition 0.
-fn random_bisection(ctrl: &mut Ctrl, graph: &mut GraphData, tpwgts: &[Real]) {
-    let nvtxs = graph.nvtxs as usize;
+fn random_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real]) {
+    let num_vertices = graph.num_vertices as usize;
 
-    let zeromaxpwgt = (ctrl.ubfactors[0] * graph.tvwgt[0] as Real * tpwgts[0]) as Idx;
+    let max_zero_weight = (ctrl.imbalance_tols[0] * graph.total_vertex_weight[0] as Real * target_part_weights[0]) as Idx;
 
-    for i in 0..nvtxs {
-        graph.where_[i] = 1;
+    for i in 0..num_vertices {
+        graph.partition[i] = 1;
     }
 
-    if nvtxs < 10 {
-        let mut perm = vec![0 as Idx; nvtxs];
-        ctrl.rng.rand_array_permute(nvtxs, &mut perm, 0, true);
+    if num_vertices < 10 {
+        let mut perm = vec![0 as Idx; num_vertices];
+        ctrl.rng.rand_array_permute(num_vertices, &mut perm, 0, true);
 
         let mut pwgt0 = 0 as Idx;
         for &pi in &perm {
             let i = pi as usize;
-            if pwgt0 + graph.vwgt[i] <= zeromaxpwgt {
-                graph.where_[i] = 0;
-                pwgt0 += graph.vwgt[i];
+            if pwgt0 + graph.vertex_weights[i] <= max_zero_weight {
+                graph.partition[i] = 0;
+                pwgt0 += graph.vertex_weights[i];
             }
         }
     } else {
-        let mut perm = vec![0 as Idx; nvtxs];
-        let nshuffles = nvtxs / 2;
-        ctrl.rng.rand_array_permute_with_nshuffles(nvtxs, &mut perm, 0, nshuffles, true);
+        let mut perm = vec![0 as Idx; num_vertices];
+        let nshuffles = num_vertices / 2;
+        ctrl.rng.rand_array_permute_with_nshuffles(num_vertices, &mut perm, 0, nshuffles, true);
 
         let mut pwgt0 = 0 as Idx;
         for &pi in &perm {
             let i = pi as usize;
-            if pwgt0 + graph.vwgt[i] <= zeromaxpwgt {
-                graph.where_[i] = 0;
-                pwgt0 += graph.vwgt[i];
+            if pwgt0 + graph.vertex_weights[i] <= max_zero_weight {
+                graph.partition[i] = 0;
+                pwgt0 += graph.vertex_weights[i];
             }
         }
     }
 }
 
 /// Compute 2-way partition parameters from scratch.
-pub fn compute_2way_partition_params(_ctrl: &Ctrl, graph: &mut GraphData) {
-    let nvtxs = graph.nvtxs as usize;
-    let ncon = graph.ncon as usize;
+pub fn compute_2way_partition_params(_ctrl: &Control, graph: &mut GraphData) {
+    let num_vertices = graph.num_vertices as usize;
+    let ncon = graph.num_constraints as usize;
 
     // Reset
-    graph.pwgts = vec![0; 2 * ncon];
-    graph.bndptr = vec![-1; nvtxs];
-    graph.bndind = vec![0; nvtxs];
-    graph.nbnd = 0;
-    graph.id = vec![0; nvtxs];
-    graph.ed = vec![0; nvtxs];
+    graph.part_weights = vec![0; 2 * ncon];
+    graph.boundary_map = vec![-1; num_vertices];
+    graph.boundary_list = vec![0; num_vertices];
+    graph.num_boundary = 0;
+    graph.internal_degree = vec![0; num_vertices];
+    graph.external_degree = vec![0; num_vertices];
 
-    // Compute pwgts
+    // Compute part_weights
     if ncon == 1 {
-        for i in 0..nvtxs {
-            graph.pwgts[graph.where_[i] as usize] += graph.vwgt[i];
+        for i in 0..num_vertices {
+            graph.part_weights[graph.partition[i] as usize] += graph.vertex_weights[i];
         }
     } else {
-        for i in 0..nvtxs {
-            let p = graph.where_[i] as usize;
+        for i in 0..num_vertices {
+            let p = graph.partition[i] as usize;
             for j in 0..ncon {
-                graph.pwgts[p * ncon + j] += graph.vwgt[i * ncon + j];
+                graph.part_weights[p * ncon + j] += graph.vertex_weights[i * ncon + j];
             }
         }
     }
 
-    // Compute id, ed, boundary, mincut
-    let mut mincut: Idx = 0;
+    // Compute id, ed, boundary, edge_cut
+    let mut edge_cut: Idx = 0;
 
-    for i in 0..nvtxs {
-        let me = graph.where_[i];
+    for i in 0..num_vertices {
+        let me = graph.partition[i];
         let mut tid: Idx = 0;
         let mut ted: Idx = 0;
 
@@ -203,21 +203,21 @@ pub fn compute_2way_partition_params(_ctrl: &Ctrl, graph: &mut GraphData) {
         let iend = graph.xadj[i + 1] as usize;
 
         for k in istart..iend {
-            if graph.where_[graph.adjncy[k] as usize] == me {
-                tid += graph.adjwgt[k];
+            if graph.partition[graph.adjacency[k] as usize] == me {
+                tid += graph.edge_weights[k];
             } else {
-                ted += graph.adjwgt[k];
+                ted += graph.edge_weights[k];
             }
         }
 
-        graph.id[i] = tid;
-        graph.ed[i] = ted;
+        graph.internal_degree[i] = tid;
+        graph.external_degree[i] = ted;
 
         if ted > 0 || istart == iend {
-            graph.bnd_insert(i);
-            mincut += ted;
+            graph.add_to_boundary(i);
+            edge_cut += ted;
         }
     }
 
-    graph.mincut = mincut / 2;
+    graph.edge_cut = edge_cut / 2;
 }

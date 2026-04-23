@@ -1,5 +1,5 @@
 use crate::types::{Idx, Real};
-use crate::ctrl::Ctrl;
+use crate::ctrl::Control;
 use crate::graph::GraphData;
 use crate::partition::fm::fm_2way_cut_refine;
 use crate::partition::balance::balance_2way;
@@ -12,8 +12,8 @@ use crate::partition::initpart::compute_2way_partition_params;
 ///   - `graph` is the coarsest graph where initial partitioning was performed
 ///   - Starts at the coarsest level, iterates: Balance -> FM refine -> project to finer
 ///   - Stops when we reach the original graph
-pub fn refine_2way(ctrl: &mut Ctrl, orggraph: *mut GraphData, graph: &mut GraphData, tpwgts: &[Real]) {
-    let niter = ctrl.niter;
+pub fn refine_2way(ctrl: &mut Control, orggraph: *mut GraphData, graph: &mut GraphData, target_part_weights: &[Real]) {
+    let niter = ctrl.num_iter;
 
     // Compute 2-way partition parameters at the coarsest level
     compute_2way_partition_params(ctrl, graph);
@@ -25,8 +25,8 @@ pub fn refine_2way(ctrl: &mut Ctrl, orggraph: *mut GraphData, graph: &mut GraphD
         let g = unsafe { &mut *cur };
 
         // Balance and refine at the current level
-        balance_2way(ctrl, g, tpwgts);
-        fm_2way_cut_refine(ctrl, g, tpwgts, niter);
+        balance_2way(ctrl, g, target_part_weights);
+        fm_2way_cut_refine(ctrl, g, target_part_weights, niter);
 
         // If we have reached the original (finest) graph, we are done
         if cur == orggraph {
@@ -49,83 +49,83 @@ pub fn refine_2way(ctrl: &mut Ctrl, orggraph: *mut GraphData, graph: &mut GraphD
 ///
 /// Matches the C METIS Project2WayPartition algorithm:
 ///   - `graph` is the finer level; `graph.coarser` is the coarser level
-///   - Uses `graph.cmap` to map fine vertices to coarse vertices
-///   - Reuses `cmap[i]` to cache `cbndptr[cmap[i]]` for the interior-node optimization
+///   - Uses `graph.coarse_map` to map fine vertices to coarse vertices
+///   - Reuses `coarse_map[i]` to cache `cboundary_map[coarse_map[i]]` for the interior-node optimization
 ///   - Computes id/ed for each vertex and builds the boundary list
-///   - Copies mincut and pwgts from the coarser graph
+///   - Copies edge_cut and part_weights from the coarser graph
 ///   - Frees (drops) the coarser graph
 fn project_2way_partition(graph: &mut GraphData) {
     // Extract all needed data from the coarser graph before mutating this graph.
     // This avoids borrow checker conflicts (coarser is owned by graph).
-    let (cwhere, cbndptr, cmincut, ncon, cpwgts) = {
+    let (cwhere, cboundary_map, cedge_cut, ncon, cpart_weights) = {
         let cgraph = graph.coarser.as_ref()
             .expect("project_2way_partition: coarser graph is None");
-        let ncon = cgraph.ncon as usize;
+        let ncon = cgraph.num_constraints as usize;
         (
-            cgraph.where_.clone(),
-            cgraph.bndptr.clone(),
-            cgraph.mincut,
+            cgraph.partition.clone(),
+            cgraph.boundary_map.clone(),
+            cgraph.edge_cut,
             ncon,
-            cgraph.pwgts[..2 * ncon].to_vec(),
+            cgraph.part_weights[..2 * ncon].to_vec(),
         )
     };
 
     // Allocate 2-way partition memory for this (finer) level
     graph.alloc_2way();
 
-    let nvtxs = graph.nvtxs as usize;
+    let num_vertices = graph.num_vertices as usize;
 
-    // Project partition: where[i] = cwhere[cmap[i]]
-    // Also cache cbndptr for the interior-node optimization: cmap[i] = cbndptr[cmap[i]]
-    for i in 0..nvtxs {
-        let j = graph.cmap[i] as usize;
-        graph.where_[i] = cwhere[j];
-        graph.cmap[i] = cbndptr[j]; // Reuse cmap to store boundary info
+    // Project partition: where[i] = cwhere[coarse_map[i]]
+    // Also cache cboundary_map for the interior-node optimization: coarse_map[i] = cboundary_map[coarse_map[i]]
+    for i in 0..num_vertices {
+        let j = graph.coarse_map[i] as usize;
+        graph.partition[i] = cwhere[j];
+        graph.coarse_map[i] = cboundary_map[j]; // Reuse coarse_map to store boundary info
     }
 
     // Compute id/ed for each vertex and build the boundary list
-    let mut nbnd: Idx = 0;
+    let mut num_boundary: Idx = 0;
 
-    for i in 0..nvtxs {
+    for i in 0..num_vertices {
         let istart = graph.xadj[i] as usize;
         let iend = graph.xadj[i + 1] as usize;
         let mut tid: Idx = 0;
         let mut ted: Idx = 0;
 
-        if graph.cmap[i] == -1 {
-            // Interior node: the coarser node was interior (cbndptr == -1),
+        if graph.coarse_map[i] == -1 {
+            // Interior node: the coarser node was interior (cboundary_map == -1),
             // so all neighbors must be in the same partition.
             for j in istart..iend {
-                tid += graph.adjwgt[j];
+                tid += graph.edge_weights[j];
             }
         } else {
             // Potentially interface node: check each neighbor's partition
-            let me = graph.where_[i];
+            let me = graph.partition[i];
             for j in istart..iend {
-                if me == graph.where_[graph.adjncy[j] as usize] {
-                    tid += graph.adjwgt[j];
+                if me == graph.partition[graph.adjacency[j] as usize] {
+                    tid += graph.edge_weights[j];
                 } else {
-                    ted += graph.adjwgt[j];
+                    ted += graph.edge_weights[j];
                 }
             }
         }
 
-        graph.id[i] = tid;
-        graph.ed[i] = ted;
+        graph.internal_degree[i] = tid;
+        graph.external_degree[i] = ted;
 
         if ted > 0 || istart == iend {
-            // BNDInsert(nbnd, bndind, bndptr, i)
-            graph.bndind[nbnd as usize] = i as Idx;
-            graph.bndptr[i] = nbnd;
-            nbnd += 1;
+            // BNDInsert(num_boundary, boundary_list, boundary_map, i)
+            graph.boundary_list[num_boundary as usize] = i as Idx;
+            graph.boundary_map[i] = num_boundary;
+            num_boundary += 1;
         }
     }
 
-    graph.mincut = cmincut;
-    graph.nbnd = nbnd;
+    graph.edge_cut = cedge_cut;
+    graph.num_boundary = num_boundary;
 
-    // Copy pwgts from coarser
-    graph.pwgts[..2 * ncon].copy_from_slice(&cpwgts);
+    // Copy part_weights from coarser
+    graph.part_weights[..2 * ncon].copy_from_slice(&cpart_weights);
 
     // Free coarser graph (FreeGraph(&graph->coarser))
     graph.coarser = None;

@@ -5,56 +5,56 @@ use crate::graph::GraphData;
 pub fn setup_graph(
     ncon: Idx,
     xadj: &[Idx],
-    adjncy: &[Idx],
-    vwgt: Option<&[Idx]>,
-    vsize: Option<&[Idx]>,
-    adjwgt: Option<&[Idx]>,
+    adjacency: &[Idx],
+    vertex_weights: Option<&[Idx]>,
+    vertex_sizes: Option<&[Idx]>,
+    edge_weights: Option<&[Idx]>,
 ) -> GraphData {
-    let nvtxs = (xadj.len() - 1) as Idx;
-    let nedges = adjncy.len() as Idx;
+    let num_vertices = (xadj.len() - 1) as Idx;
+    let num_edges = adjacency.len() as Idx;
 
     let mut g = GraphData::new();
-    g.nvtxs = nvtxs;
-    g.nedges = nedges;
-    g.ncon = ncon;
+    g.num_vertices = num_vertices;
+    g.num_edges = num_edges;
+    g.num_constraints = ncon;
 
     g.xadj = xadj.to_vec();
-    g.adjncy = adjncy.to_vec();
+    g.adjacency = adjacency.to_vec();
 
-    g.vwgt = match vwgt {
+    g.vertex_weights = match vertex_weights {
         Some(w) => w.to_vec(),
-        None => vec![1; (nvtxs * ncon) as usize],
+        None => vec![1; (num_vertices * ncon) as usize],
     };
 
-    g.vsize = match vsize {
+    g.vertex_sizes = match vertex_sizes {
         Some(s) => s.to_vec(),
-        None => vec![1; nvtxs as usize],
+        None => vec![1; num_vertices as usize],
     };
 
-    g.adjwgt = match adjwgt {
+    g.edge_weights = match edge_weights {
         Some(w) => w.to_vec(),
-        None => vec![1; nedges as usize],
+        None => vec![1; num_edges as usize],
     };
 
-    g.label = (0..nvtxs).collect();
+    g.label = (0..num_vertices).collect();
 
-    setup_graph_tvwgt(&mut g);
+    setup_graph_total_vertex_weight(&mut g);
 
     g
 }
 
 /// Compute total vertex weights and their inverses.
-pub fn setup_graph_tvwgt(g: &mut GraphData) {
-    let ncon = g.ncon as usize;
-    let nvtxs = g.nvtxs as usize;
+pub fn setup_graph_total_vertex_weight(g: &mut GraphData) {
+    let ncon = g.num_constraints as usize;
+    let num_vertices = g.num_vertices as usize;
 
-    g.tvwgt = vec![0; ncon];
-    g.invtvwgt = vec![0.0; ncon];
+    g.total_vertex_weight = vec![0; ncon];
+    g.inv_total_vertex_weight = vec![0.0; ncon];
 
     for j in 0..ncon {
-        for i in 0..nvtxs {
-            g.tvwgt[j] += g.vwgt[i * ncon + j];
+        for i in 0..num_vertices {
+            g.total_vertex_weight[j] += g.vertex_weights[i * ncon + j];
         }
-        g.invtvwgt[j] = 1.0 / g.tvwgt[j].max(1) as Real;
+        g.inv_total_vertex_weight[j] = 1.0 / g.total_vertex_weight[j].max(1) as Real;
     }
 }

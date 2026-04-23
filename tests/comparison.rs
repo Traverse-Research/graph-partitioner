@@ -3,18 +3,18 @@ mod fixtures;
 use fixtures::*;
 
 /// Helper: run part_kway on both implementations and compare.
-fn compare_part_kway(xadj: &[i32], adjncy: &[i32], nparts: i32, seed: i32) {
+fn compare_part_kway(xadj: &[i32], adjacency: &[i32], nparts: i32, seed: i32) {
     let n = xadj.len() - 1;
     let mut c_part = vec![0i32; n];
     let mut r_part = vec![0i32; n];
 
-    let c_cut = metis::Graph::new(1, nparts, xadj, adjncy)
+    let c_cut = metis::Graph::new(1, nparts, xadj, adjacency)
         .unwrap()
         .set_option(metis::option::Seed(seed))
         .part_kway(&mut c_part)
         .unwrap();
 
-    let r_cut = metis_clone::Graph::new(1, nparts, xadj, adjncy)
+    let r_cut = metis_clone::Graph::new(1, nparts, xadj, adjacency)
         .unwrap()
         .set_option(metis_clone::option::Seed(seed))
         .part_kway(&mut r_part)
@@ -40,9 +40,9 @@ fn compare_part_kway(xadj: &[i32], adjncy: &[i32], nparts: i32, seed: i32) {
 /// Helper for weighted graphs.
 fn compare_part_kway_weighted(
     xadj: &[i32],
-    adjncy: &[i32],
-    vwgt: &[i32],
-    adjwgt: &[i32],
+    adjacency: &[i32],
+    vertex_weights: &[i32],
+    edge_weights: &[i32],
     nparts: i32,
     seed: i32,
 ) {
@@ -50,18 +50,18 @@ fn compare_part_kway_weighted(
     let mut c_part = vec![0i32; n];
     let mut r_part = vec![0i32; n];
 
-    let c_cut = metis::Graph::new(1, nparts, xadj, adjncy)
+    let c_cut = metis::Graph::new(1, nparts, xadj, adjacency)
         .unwrap()
-        .set_vwgt(vwgt)
-        .set_adjwgt(adjwgt)
+        .set_vwgt(vertex_weights)
+        .set_adjwgt(edge_weights)
         .set_option(metis::option::Seed(seed))
         .part_kway(&mut c_part)
         .unwrap();
 
-    let r_cut = metis_clone::Graph::new(1, nparts, xadj, adjncy)
+    let r_cut = metis_clone::Graph::new(1, nparts, xadj, adjacency)
         .unwrap()
-        .set_vwgt(vwgt)
-        .set_adjwgt(adjwgt)
+        .set_vertex_weights(vertex_weights)
+        .set_edge_weights(edge_weights)
         .set_option(metis_clone::option::Seed(seed))
         .part_kway(&mut r_part)
         .unwrap();
@@ -75,20 +75,20 @@ fn compare_part_kway_weighted(
 }
 
 /// Helper for mesh part_dual.
-fn compare_part_dual(eptr: &[i32], eind: &[i32], nn: i32, nparts: i32, seed: i32) {
-    let ne = eptr.len() - 1;
+fn compare_part_dual(element_offsets: &[i32], element_indices: &[i32], nn: i32, nparts: i32, seed: i32) {
+    let ne = element_offsets.len() - 1;
     let mut c_epart = vec![0i32; ne];
     let mut c_npart = vec![0i32; nn as usize];
     let mut r_epart = vec![0i32; ne];
     let mut r_npart = vec![0i32; nn as usize];
 
-    let c_cut = metis::Mesh::new(nparts, eptr, eind)
+    let c_cut = metis::Mesh::new(nparts, element_offsets, element_indices)
         .unwrap()
         .set_option(metis::option::Seed(seed))
         .part_dual(&mut c_epart, &mut c_npart)
         .unwrap();
 
-    let r_cut = metis_clone::Mesh::new(nparts, eptr, eind)
+    let r_cut = metis_clone::Mesh::new(nparts, element_offsets, element_indices)
         .unwrap()
         .set_option(metis_clone::option::Seed(seed))
         .part_dual(&mut r_epart, &mut r_npart)
@@ -111,10 +111,10 @@ fn compare_part_dual(eptr: &[i32], eind: &[i32], nn: i32, nparts: i32, seed: i32
 
 #[test]
 fn test_trivial_2v_valid() {
-    let (xadj, adjncy) = trivial_2v();
+    let (xadj, adjacency) = trivial_2v();
     let n = xadj.len() - 1;
     let mut part = vec![0i32; n];
-    let cut = metis_clone::Graph::new(1, 2, &xadj, &adjncy)
+    let cut = metis_clone::Graph::new(1, 2, &xadj, &adjacency)
         .unwrap()
         .set_option(metis_clone::option::Seed(42))
         .part_kway(&mut part)
@@ -127,10 +127,10 @@ fn test_trivial_2v_valid() {
 
 #[test]
 fn test_path_5v_valid() {
-    let (xadj, adjncy) = path_5v();
+    let (xadj, adjacency) = path_5v();
     let n = xadj.len() - 1;
     let mut part = vec![0i32; n];
-    let cut = metis_clone::Graph::new(1, 2, &xadj, &adjncy)
+    let cut = metis_clone::Graph::new(1, 2, &xadj, &adjacency)
         .unwrap()
         .set_option(metis_clone::option::Seed(42))
         .part_kway(&mut part)
@@ -143,11 +143,11 @@ fn test_path_5v_valid() {
 
 #[test]
 fn test_grid_3x5_valid() {
-    let (xadj, adjncy) = grid_3x5();
+    let (xadj, adjacency) = grid_3x5();
     let n = xadj.len() - 1;
     for &nparts in &[2, 3, 4] {
         let mut part = vec![0i32; n];
-        let cut = metis_clone::Graph::new(1, nparts, &xadj, &adjncy)
+        let cut = metis_clone::Graph::new(1, nparts, &xadj, &adjacency)
             .unwrap()
             .set_option(metis_clone::option::Seed(42))
             .part_kway(&mut part)
@@ -161,10 +161,10 @@ fn test_grid_3x5_valid() {
 
 #[test]
 fn test_nparts_1_returns_zeros() {
-    let (xadj, adjncy) = grid_3x5();
+    let (xadj, adjacency) = grid_3x5();
     let n = xadj.len() - 1;
     let mut part = vec![-1i32; n];
-    let cut = metis_clone::Graph::new(1, 1, &xadj, &adjncy)
+    let cut = metis_clone::Graph::new(1, 1, &xadj, &adjacency)
         .unwrap()
         .part_kway(&mut part)
         .unwrap();
@@ -174,11 +174,11 @@ fn test_nparts_1_returns_zeros() {
 
 #[test]
 fn test_mesh_nparts_1_returns_zeros() {
-    let (eptr, eind, nn) = tri_mesh();
-    let ne = eptr.len() - 1;
+    let (element_offsets, element_indices, nn) = tri_mesh();
+    let ne = element_offsets.len() - 1;
     let mut epart = vec![-1i32; ne];
     let mut npart = vec![-1i32; nn as usize];
-    let cut = metis_clone::Mesh::new(1, &eptr, &eind)
+    let cut = metis_clone::Mesh::new(1, &element_offsets, &element_indices)
         .unwrap()
         .part_dual(&mut epart, &mut npart)
         .unwrap();
@@ -195,7 +195,7 @@ fn test_mesh_nparts_1_returns_zeros() {
 fn compare_10v_subgraph() {
     // 10v subgraph (original adjacency order, no reordering)
     let xadj = vec![0, 2, 5, 8, 9, 12, 16, 19, 21, 24, 26];
-    let adjncy = vec![
+    let adjacency = vec![
         1, 4,           // v0
         0, 2, 5,        // v1
         1, 3, 6,        // v2
@@ -208,7 +208,7 @@ fn compare_10v_subgraph() {
         6, 8,           // v9
     ];
     for &seed in &[42, 0, -1, 1128597453] {
-        compare_part_kway(&xadj, &adjncy, 2, seed);
+        compare_part_kway(&xadj, &adjacency, 2, seed);
     }
 }
 
@@ -216,89 +216,89 @@ fn compare_10v_subgraph() {
 
 #[test]
 fn compare_trivial_2v() {
-    let (xadj, adjncy) = trivial_2v();
+    let (xadj, adjacency) = trivial_2v();
     for &seed in &[42, 0, 12345] {
-        compare_part_kway(&xadj, &adjncy, 2, seed);
+        compare_part_kway(&xadj, &adjacency, 2, seed);
     }
 }
 
 #[test]
 fn compare_path_5v() {
-    let (xadj, adjncy) = path_5v();
+    let (xadj, adjacency) = path_5v();
     for &seed in &[42, 0, 12345] {
-        compare_part_kway(&xadj, &adjncy, 2, seed);
+        compare_part_kway(&xadj, &adjacency, 2, seed);
     }
 }
 
 #[test]
 fn compare_grid_3x5_2parts() {
-    let (xadj, adjncy) = grid_3x5();
+    let (xadj, adjacency) = grid_3x5();
     for &seed in &[42, 0, 12345] {
-        compare_part_kway(&xadj, &adjncy, 2, seed);
+        compare_part_kway(&xadj, &adjacency, 2, seed);
     }
 }
 
 #[test]
 fn compare_grid_3x5_3parts() {
-    let (xadj, adjncy) = grid_3x5();
+    let (xadj, adjacency) = grid_3x5();
     for &seed in &[42, 0, 12345] {
-        compare_part_kway(&xadj, &adjncy, 3, seed);
+        compare_part_kway(&xadj, &adjacency, 3, seed);
     }
 }
 
 #[test]
 fn compare_grid_3x5_4parts() {
-    let (xadj, adjncy) = grid_3x5();
+    let (xadj, adjacency) = grid_3x5();
     for &seed in &[42, 0] {
-        compare_part_kway(&xadj, &adjncy, 4, seed);
+        compare_part_kway(&xadj, &adjacency, 4, seed);
     }
 }
 
 #[test]
 fn compare_irregular_6v() {
-    let (xadj, adjncy) = irregular_6v();
+    let (xadj, adjacency) = irregular_6v();
     for &seed in &[42, 0, 12345] {
-        compare_part_kway(&xadj, &adjncy, 2, seed);
-        compare_part_kway(&xadj, &adjncy, 3, seed);
+        compare_part_kway(&xadj, &adjacency, 2, seed);
+        compare_part_kway(&xadj, &adjacency, 3, seed);
     }
 }
 
 #[test]
 fn compare_grid_10x10_2parts() {
-    let (xadj, adjncy) = grid_10x10();
+    let (xadj, adjacency) = grid_10x10();
     for &seed in &[42, 0] {
-        compare_part_kway(&xadj, &adjncy, 2, seed);
+        compare_part_kway(&xadj, &adjacency, 2, seed);
     }
 }
 
 #[test]
 fn compare_grid_10x10_4parts() {
-    let (xadj, adjncy) = grid_10x10();
+    let (xadj, adjacency) = grid_10x10();
     for &seed in &[42, 0] {
-        compare_part_kway(&xadj, &adjncy, 4, seed);
+        compare_part_kway(&xadj, &adjacency, 4, seed);
     }
 }
 
 #[test]
 fn compare_grid_10x10_8parts() {
-    let (xadj, adjncy) = grid_10x10();
+    let (xadj, adjacency) = grid_10x10();
     for &seed in &[42] {
-        compare_part_kway(&xadj, &adjncy, 8, seed);
+        compare_part_kway(&xadj, &adjacency, 8, seed);
     }
 }
 
 #[test]
 fn compare_tri_mesh_dual() {
-    let (eptr, eind, nn) = tri_mesh();
+    let (element_offsets, element_indices, nn) = tri_mesh();
     for &seed in &[42, 0] {
-        compare_part_dual(&eptr, &eind, nn, 2, seed);
+        compare_part_dual(&element_offsets, &element_indices, nn, 2, seed);
     }
 }
 
 #[test]
 fn compare_quad_mesh_dual() {
-    let (eptr, eind, nn) = quad_mesh();
+    let (element_offsets, element_indices, nn) = quad_mesh();
     for &seed in &[42, 0] {
-        compare_part_dual(&eptr, &eind, nn, 2, seed);
+        compare_part_dual(&element_offsets, &element_indices, nn, 2, seed);
     }
 }

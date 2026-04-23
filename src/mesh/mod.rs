@@ -4,27 +4,27 @@ use crate::types::Idx;
 
 /// Build the dual graph from a mesh, matching C METIS CreateGraphDual exactly.
 /// Elements become vertices. Two elements share an edge in the dual if they
-/// share at least `ncommon` nodes.
+/// share at least `min_common_nodes` nodes.
 ///
 /// Adjacency order matches C METIS: neighbors are listed in the order they are
-/// first discovered by iterating through the element's nodes (in eind order)
+/// first discovered by iterating through the element's nodes (in element_indices order)
 /// and for each node, iterating through elements sharing that node (in element
 /// index order from the node-element CSR).
 pub fn create_graph_dual(
     ne: Idx,
     nn: Idx,
-    eptr: &[Idx],
-    eind: &[Idx],
-    ncommon: Idx,
+    element_offsets: &[Idx],
+    element_indices: &[Idx],
+    min_common_nodes: Idx,
 ) -> (Vec<Idx>, Vec<Idx>) {
     let ne_usize = ne as usize;
 
     // Build node-to-element CSR mapping (nptr/nind)
-    let (nptr, nind) = build_node_element_csr(ne, nn, eptr, eind);
+    let (nptr, nind) = build_node_element_csr(ne, nn, element_offsets, element_indices);
 
     // Build dual graph using marker-based discovery (matching C METIS FindCommonElements)
     let mut xadj = vec![0 as Idx; ne_usize + 1];
-    let mut adjncy_vec = Vec::new();
+    let mut adjacency_vec = Vec::new();
 
     // marker[j] tracks the number of shared nodes between current element and element j
     // 0 = not yet encountered
@@ -35,8 +35,8 @@ pub fn create_graph_dual(
         nbrs.clear();
 
         // For each node of element i, find all elements sharing that node
-        for k in eptr[i] as usize..eptr[i + 1] as usize {
-            let node = eind[k] as usize;
+        for k in element_offsets[i] as usize..element_offsets[i + 1] as usize {
+            let node = element_indices[k] as usize;
             for j_idx in nptr[node] as usize..nptr[node + 1] as usize {
                 let j = nind[j_idx] as usize;
                 if j == i {
@@ -50,11 +50,11 @@ pub fn create_graph_dual(
             }
         }
 
-        // Filter: keep only neighbors with shared-node count >= ncommon
+        // Filter: keep only neighbors with shared-node count >= min_common_nodes
         // Preserve the discovery order (matching C METIS)
         for &j in &nbrs {
-            if marker[j] >= ncommon {
-                adjncy_vec.push(j as Idx);
+            if marker[j] >= min_common_nodes {
+                adjacency_vec.push(j as Idx);
             }
         }
 
@@ -63,10 +63,10 @@ pub fn create_graph_dual(
             marker[j] = 0;
         }
 
-        xadj[i + 1] = adjncy_vec.len() as Idx;
+        xadj[i + 1] = adjacency_vec.len() as Idx;
     }
 
-    (xadj, adjncy_vec)
+    (xadj, adjacency_vec)
 }
 
 /// Build node-to-element CSR mapping.
@@ -74,16 +74,16 @@ pub fn create_graph_dual(
 pub fn build_node_element_csr(
     ne: Idx,
     nn: Idx,
-    eptr: &[Idx],
-    eind: &[Idx],
+    element_offsets: &[Idx],
+    element_indices: &[Idx],
 ) -> (Vec<Idx>, Vec<Idx>) {
     let ne_usize = ne as usize;
     let nn_usize = nn as usize;
 
     let mut nptr = vec![0 as Idx; nn_usize + 1];
     for i in 0..ne_usize {
-        for k in eptr[i] as usize..eptr[i + 1] as usize {
-            nptr[eind[k] as usize + 1] += 1;
+        for k in element_offsets[i] as usize..element_offsets[i + 1] as usize {
+            nptr[element_indices[k] as usize + 1] += 1;
         }
     }
     // Prefix sum (MAKECSR equivalent)
@@ -94,8 +94,8 @@ pub fn build_node_element_csr(
     let mut nind = vec![0 as Idx; nptr[nn_usize] as usize];
     let mut nptr_copy = nptr.clone();
     for i in 0..ne_usize {
-        for k in eptr[i] as usize..eptr[i + 1] as usize {
-            let node = eind[k] as usize;
+        for k in element_offsets[i] as usize..element_offsets[i + 1] as usize {
+            let node = element_indices[k] as usize;
             nind[nptr_copy[node] as usize] = i as Idx;
             nptr_copy[node] += 1;
         }

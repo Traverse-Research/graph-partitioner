@@ -12,8 +12,8 @@ use std::ptr;
 #[test]
 fn debug_c_recursive_irregular_6v() {
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 7, 11, 14, 16];
-    let mut adjncy: Vec<idx_t> = vec![1, 3, 0, 2, 3, 1, 4, 0, 1, 4, 5, 2, 3, 5, 3, 4];
-    let mut nvtxs: idx_t = 6;
+    let mut adjacency: Vec<idx_t> = vec![1, 3, 0, 2, 3, 1, 4, 0, 1, 4, 5, 2, 3, 5, 3, 4];
+    let mut num_vertices: idx_t = 6;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
     let mut edgecut: idx_t = 0;
@@ -28,15 +28,15 @@ fn debug_c_recursive_irregular_6v() {
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
-            ptr::null_mut(), // vwgt
-            ptr::null_mut(), // vsize
-            ptr::null_mut(), // adjwgt
+            adjacency.as_mut_ptr(),
+            ptr::null_mut(), // vertex_weights
+            ptr::null_mut(), // vertex_sizes
+            ptr::null_mut(), // edge_weights
             &mut nparts,
-            ptr::null_mut(), // tpwgts
+            ptr::null_mut(), // target_part_weights
             ptr::null_mut(), // ubvec
             options.as_mut_ptr(),
             &mut edgecut,
@@ -52,10 +52,10 @@ fn debug_c_recursive_irregular_6v() {
     let mut edgecut2: idx_t = 0;
     let ret2 = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),
@@ -78,8 +78,8 @@ fn debug_c_recursive_coarsened_6v() {
     // The SINGLY-coarsened adjacency (from k-way CreateCoarseGraph with self-loop removal):
     // v0: [3, 1], v1: [3, 0, 2], v2: [4, 1], v3: [5, 0, 1, 4], v4: [5, 2, 3], v5: [4, 3]
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 7, 11, 14, 16];
-    let mut adjncy: Vec<idx_t> = vec![3, 1, 3, 0, 2, 4, 1, 5, 0, 1, 4, 5, 2, 3, 4, 3];
-    let mut nvtxs: idx_t = 6;
+    let mut adjacency: Vec<idx_t> = vec![3, 1, 3, 0, 2, 4, 1, 5, 0, 1, 4, 5, 2, 3, 4, 3];
+    let mut num_vertices: idx_t = 6;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -96,10 +96,10 @@ fn debug_c_recursive_coarsened_6v() {
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),
@@ -120,13 +120,13 @@ fn debug_c_recursive_coarsened_6v() {
 /// - ncuts=4 (ctrl->nIparts for CoarsenTo=60=30*2)
 /// - niter=10 (default)
 /// - seed=-1 (inner PMETIS always gets seed=-1)
-/// - ubvec computed from kway ubfactors: pow(1.0300499, 1/ln(2))
+/// - ubvec computed from kway imbalance_tols: pow(1.0300499, 1/ln(2))
 /// - The ORIGINAL graph (since kway can't coarsen 6v with CoarsenTo=60)
 #[test]
 fn debug_c_recursive_as_init_kway() {
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 7, 11, 14, 16];
-    let mut adjncy: Vec<idx_t> = vec![1, 3, 0, 2, 3, 1, 4, 0, 1, 4, 5, 2, 3, 5, 3, 4];
-    let mut nvtxs: idx_t = 6;
+    let mut adjacency: Vec<idx_t> = vec![1, 3, 0, 2, 3, 1, 4, 0, 1, 4, 5, 2, 3, 5, 3, 4];
+    let mut num_vertices: idx_t = 6;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -141,8 +141,8 @@ fn debug_c_recursive_as_init_kway() {
     // OBJTYPE stays default (CUT)
 
     // Compute ubvec as InitKWayPartitioning does:
-    // ubvec[i] = pow(ctrl->ubfactors[i], 1.0/log(nparts))
-    // ctrl->ubfactors[0] = 1.0 + 0.001 * 30 + 0.0000499 = 1.0300499 (kway ufactor=30)
+    // ubvec[i] = pow(ctrl->imbalance_tols[i], 1.0/log(nparts))
+    // ctrl->imbalance_tols[0] = 1.0 + 0.001 * 30 + 0.0000499 = 1.0300499 (kway ufactor=30)
     let kway_ubfactor: f32 = 1.0 + 0.001 * 30.0 + 0.0000499;
     let ubvec_val: f32 = (kway_ubfactor as f64).powf(1.0 / (2.0_f64).ln()) as f32;
     eprintln!("DEBUG ubvec_val = {}", ubvec_val);
@@ -153,10 +153,10 @@ fn debug_c_recursive_as_init_kway() {
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),
@@ -180,8 +180,8 @@ fn debug_c_recursive_coarsened_with_ubvec() {
     // The SINGLY-coarsened adjacency (from k-way CreateCoarseGraph with self-loop removal):
     // v0: [3, 1], v1: [3, 0, 2], v2: [4, 1], v3: [5, 0, 1, 4], v4: [5, 2, 3], v5: [4, 3]
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 7, 11, 14, 16];
-    let mut adjncy: Vec<idx_t> = vec![3, 1, 3, 0, 2, 4, 1, 5, 0, 1, 4, 5, 2, 3, 4, 3];
-    let mut nvtxs: idx_t = 6;
+    let mut adjacency: Vec<idx_t> = vec![3, 1, 3, 0, 2, 4, 1, 5, 0, 1, 4, 5, 2, 3, 4, 3];
+    let mut num_vertices: idx_t = 6;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -195,8 +195,8 @@ fn debug_c_recursive_coarsened_with_ubvec() {
     // Seed stays -1 (default)
 
     // Compute ubvec as InitKWayPartitioning does:
-    // ubvec[i] = pow(ctrl->ubfactors[i], 1.0/log(nparts))
-    // ctrl->ubfactors[0] = 1.0 + 0.001 * 30 + 0.0000499 = 1.0300499 (kway ufactor=30)
+    // ubvec[i] = pow(ctrl->imbalance_tols[i], 1.0/log(nparts))
+    // ctrl->imbalance_tols[0] = 1.0 + 0.001 * 30 + 0.0000499 = 1.0300499 (kway ufactor=30)
     let kway_ubfactor: f32 = 1.0 + 0.001 * 30.0 + 0.0000499;
     let ubvec_val: f32 = (kway_ubfactor as f64).powf(1.0 / (2.0_f64).ln()) as f32;
     eprintln!("DEBUG ubvec_val = {}", ubvec_val);
@@ -207,10 +207,10 @@ fn debug_c_recursive_coarsened_with_ubvec() {
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),
@@ -289,8 +289,8 @@ fn debug_compare_rng() {
 #[test]
 fn debug_c_recursive_coarsened_ncuts1() {
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 7, 11, 14, 16];
-    let mut adjncy: Vec<idx_t> = vec![3, 1, 3, 0, 2, 4, 1, 5, 0, 1, 4, 5, 2, 3, 4, 3];
-    let mut nvtxs: idx_t = 6;
+    let mut adjacency: Vec<idx_t> = vec![3, 1, 3, 0, 2, 4, 1, 5, 0, 1, 4, 5, 2, 3, 4, 3];
+    let mut num_vertices: idx_t = 6;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -311,10 +311,10 @@ fn debug_c_recursive_coarsened_ncuts1() {
 
         let ret = unsafe {
             METIS_PartGraphRecursive(
-                &mut nvtxs,
+                &mut num_vertices,
                 &mut ncon,
                 xadj.as_mut_ptr(),
-                adjncy.as_mut_ptr(),
+                adjacency.as_mut_ptr(),
                 ptr::null_mut(),
                 ptr::null_mut(),
                 ptr::null_mut(),
@@ -337,10 +337,10 @@ fn debug_c_recursive_coarsened_ncuts1() {
 #[test]
 fn debug_c_recursive_coarsened_53v() {
     let mut xadj: Vec<idx_t> = vec![0, 3, 7, 12, 16, 21, 24, 27, 33, 37, 42, 47, 51, 55, 59, 65, 69, 75, 78, 83, 87, 91, 96, 101, 105, 108, 113, 116, 120, 126, 132, 137, 142, 146, 150, 155, 161, 167, 171, 175, 179, 184, 189, 194, 198, 203, 206, 210, 215, 218, 221, 225, 229, 232];
-    let mut adjncy: Vec<idx_t> = vec![7, 6, 1, 8, 0, 7, 2, 15, 1, 3, 8, 9, 10, 2, 9, 4, 16, 3, 5, 10, 11, 12, 4, 11, 13, 0, 7, 14, 0, 6, 13, 1, 8, 14, 1, 7, 2, 21, 3, 2, 10, 15, 22, 3, 9, 4, 16, 16, 5, 4, 12, 23, 5, 11, 16, 14, 6, 17, 7, 19, 7, 13, 18, 8, 15, 20, 2, 14, 9, 23, 4, 10, 22, 11, 12, 18, 13, 24, 28, 14, 17, 19, 24, 28, 14, 18, 20, 29, 15, 19, 21, 29, 9, 20, 22, 25, 23, 10, 21, 25, 16, 12, 16, 22, 26, 18, 17, 27, 31, 22, 21, 30, 26, 32, 23, 25, 34, 24, 33, 28, 35, 18, 27, 34, 19, 29, 36, 20, 28, 35, 21, 30, 42, 25, 29, 31, 36, 43, 25, 30, 32, 37, 38, 26, 31, 37, 45, 27, 34, 39, 35, 27, 33, 39, 28, 41, 28, 34, 40, 29, 36, 47, 29, 35, 30, 41, 42, 44, 32, 31, 38, 48, 32, 37, 44, 40, 34, 33, 46, 50, 35, 39, 41, 46, 50, 35, 40, 36, 47, 51, 36, 41, 42, 47, 51, 31, 42, 44, 52, 37, 43, 38, 48, 49, 33, 46, 40, 39, 45, 49, 51, 36, 41, 42, 50, 52, 38, 44, 50, 46, 45, 47, 40, 49, 41, 52, 42, 47, 43, 48, 44, 51];
-    let mut adjwgt: Vec<idx_t> = vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
-    let mut vwgt: Vec<idx_t> = vec![2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1];
-    let mut nvtxs: idx_t = 53;
+    let mut adjacency: Vec<idx_t> = vec![7, 6, 1, 8, 0, 7, 2, 15, 1, 3, 8, 9, 10, 2, 9, 4, 16, 3, 5, 10, 11, 12, 4, 11, 13, 0, 7, 14, 0, 6, 13, 1, 8, 14, 1, 7, 2, 21, 3, 2, 10, 15, 22, 3, 9, 4, 16, 16, 5, 4, 12, 23, 5, 11, 16, 14, 6, 17, 7, 19, 7, 13, 18, 8, 15, 20, 2, 14, 9, 23, 4, 10, 22, 11, 12, 18, 13, 24, 28, 14, 17, 19, 24, 28, 14, 18, 20, 29, 15, 19, 21, 29, 9, 20, 22, 25, 23, 10, 21, 25, 16, 12, 16, 22, 26, 18, 17, 27, 31, 22, 21, 30, 26, 32, 23, 25, 34, 24, 33, 28, 35, 18, 27, 34, 19, 29, 36, 20, 28, 35, 21, 30, 42, 25, 29, 31, 36, 43, 25, 30, 32, 37, 38, 26, 31, 37, 45, 27, 34, 39, 35, 27, 33, 39, 28, 41, 28, 34, 40, 29, 36, 47, 29, 35, 30, 41, 42, 44, 32, 31, 38, 48, 32, 37, 44, 40, 34, 33, 46, 50, 35, 39, 41, 46, 50, 35, 40, 36, 47, 51, 36, 41, 42, 47, 51, 31, 42, 44, 52, 37, 43, 38, 48, 49, 33, 46, 40, 39, 45, 49, 51, 36, 41, 42, 50, 52, 38, 44, 50, 46, 45, 47, 40, 49, 41, 52, 42, 47, 43, 48, 44, 51];
+    let mut edge_weights: Vec<idx_t> = vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+    let mut vertex_weights: Vec<idx_t> = vec![2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1];
+    let mut num_vertices: idx_t = 53;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -352,8 +352,8 @@ fn debug_c_recursive_coarsened_53v() {
     options[8] = 4;   // NCUTS = 4 (ctrl->niparts)
 
     // Compute ubvec as init_kway_partition does:
-    // kway ctrl->ubfactors[0] = 1.0 + 0.001 * 30 + 0.0000499 = 1.0300499
-    // init_kway_partition: ubvec[i] = pow(ctrl->ubfactors[i], 1.0/log(nparts))
+    // kway ctrl->imbalance_tols[0] = 1.0 + 0.001 * 30 + 0.0000499 = 1.0300499
+    // init_kway_partition: ubvec[i] = pow(ctrl->imbalance_tols[i], 1.0/log(nparts))
     // Then C's SetupCtrl for the inner PMETIS adds ANOTHER +0.0000499.
     // So we pass the ubvec WITHOUT the extra fudge — C will add it internally.
     let kway_ubfactor: f32 = 1.0 + 0.001 * 30.0 + 0.0000499;
@@ -367,15 +367,15 @@ fn debug_c_recursive_coarsened_53v() {
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
-            vwgt.as_mut_ptr(),
-            ptr::null_mut(), // vsize
-            adjwgt.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
+            vertex_weights.as_mut_ptr(),
+            ptr::null_mut(), // vertex_sizes
+            edge_weights.as_mut_ptr(),
             &mut nparts,
-            ptr::null_mut(), // tpwgts
+            ptr::null_mut(), // target_part_weights
             ubvec.as_mut_ptr(),
             options.as_mut_ptr(),
             &mut edgecut,
@@ -392,13 +392,13 @@ fn debug_c_recursive_coarsened_53v() {
     let mut edgecut1: idx_t = 0;
     let ret1 = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
-            vwgt.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
+            vertex_weights.as_mut_ptr(),
             ptr::null_mut(),
-            adjwgt.as_mut_ptr(),
+            edge_weights.as_mut_ptr(),
             &mut nparts,
             ptr::null_mut(),
             ubvec.as_mut_ptr(),
@@ -424,19 +424,19 @@ fn debug_c_recursive_grid15_nparts3() {
     let cols = 5;
     let n = rows * cols;
     let mut xadj = vec![0i32; n + 1];
-    let mut adjncy_vec = Vec::new();
+    let mut adjacency_vec = Vec::new();
     for r in 0..rows {
         for c in 0..cols {
             let v = r * cols + c;
-            if r > 0 { adjncy_vec.push((v - cols) as i32); }
-            if c > 0 { adjncy_vec.push((v - 1) as i32); }
-            if c + 1 < cols { adjncy_vec.push((v + 1) as i32); }
-            if r + 1 < rows { adjncy_vec.push((v + cols) as i32); }
-            xadj[v + 1] = adjncy_vec.len() as i32;
+            if r > 0 { adjacency_vec.push((v - cols) as i32); }
+            if c > 0 { adjacency_vec.push((v - 1) as i32); }
+            if c + 1 < cols { adjacency_vec.push((v + 1) as i32); }
+            if r + 1 < rows { adjacency_vec.push((v + cols) as i32); }
+            xadj[v + 1] = adjacency_vec.len() as i32;
         }
     }
 
-    let mut nvtxs: idx_t = n as idx_t;
+    let mut num_vertices: idx_t = n as idx_t;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 3;
 
@@ -446,7 +446,7 @@ fn debug_c_recursive_grid15_nparts3() {
     options[8] = 4;   // NCUTS = 4
 
     // Compute ubvec as init_kway_partition does:
-    // kway ctrl->ubfactors[0] = 1.0 + 0.001*30 + 0.0000499 = 1.0300499
+    // kway ctrl->imbalance_tols[0] = 1.0 + 0.001*30 + 0.0000499 = 1.0300499
     // ubvec = pow(1.0300499, 1/ln(3))
     let kway_ubfactor: f32 = 1.0 + 0.001 * 30.0 + 0.0000499;
     let ubvec_val: f32 = (kway_ubfactor as f64).powf(1.0 / (3.0_f64).ln()) as f32;
@@ -458,15 +458,15 @@ fn debug_c_recursive_grid15_nparts3() {
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy_vec.as_mut_ptr(),
-            ptr::null_mut(), // vwgt (defaults to all 1s)
-            ptr::null_mut(), // vsize
-            ptr::null_mut(), // adjwgt (defaults to all 1s)
+            adjacency_vec.as_mut_ptr(),
+            ptr::null_mut(), // vertex_weights (defaults to all 1s)
+            ptr::null_mut(), // vertex_sizes
+            ptr::null_mut(), // edge_weights (defaults to all 1s)
             &mut nparts,
-            ptr::null_mut(), // tpwgts (defaults to uniform 1/3)
+            ptr::null_mut(), // target_part_weights (defaults to uniform 1/3)
             ubvec.as_mut_ptr(),
             options.as_mut_ptr(),
             &mut edgecut,
@@ -488,10 +488,10 @@ fn debug_c_recursive_grid15_nparts3() {
 
     let ret2 = unsafe {
         METIS_PartGraphKway(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy_vec.as_mut_ptr(),
+            adjacency_vec.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),
@@ -509,7 +509,7 @@ fn debug_c_recursive_grid15_nparts3() {
 }
 
 /// Isolate the FIRST bisection of the nparts=3 recursive bisection.
-/// Calls C's PartGraphRecursive with nparts=2 and tpwgts=[1/3, 2/3].
+/// Calls C's PartGraphRecursive with nparts=2 and target_part_weights=[1/3, 2/3].
 /// This should produce the same partition as the first step of nparts=3 recursive bisection.
 #[test]
 fn debug_c_recursive_grid15_first_bisection() {
@@ -518,19 +518,19 @@ fn debug_c_recursive_grid15_first_bisection() {
     let cols = 5;
     let n = rows * cols;
     let mut xadj = vec![0i32; n + 1];
-    let mut adjncy_vec = Vec::new();
+    let mut adjacency_vec = Vec::new();
     for r in 0..rows {
         for c in 0..cols {
             let v = r * cols + c;
-            if r > 0 { adjncy_vec.push((v - cols) as i32); }
-            if c > 0 { adjncy_vec.push((v - 1) as i32); }
-            if c + 1 < cols { adjncy_vec.push((v + 1) as i32); }
-            if r + 1 < rows { adjncy_vec.push((v + cols) as i32); }
-            xadj[v + 1] = adjncy_vec.len() as i32;
+            if r > 0 { adjacency_vec.push((v - cols) as i32); }
+            if c > 0 { adjacency_vec.push((v - 1) as i32); }
+            if c + 1 < cols { adjacency_vec.push((v + 1) as i32); }
+            if r + 1 < rows { adjacency_vec.push((v + cols) as i32); }
+            xadj[v + 1] = adjacency_vec.len() as i32;
         }
     }
 
-    let mut nvtxs: idx_t = n as idx_t;
+    let mut num_vertices: idx_t = n as idx_t;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -544,23 +544,23 @@ fn debug_c_recursive_grid15_first_bisection() {
     let ubvec_val: f32 = (kway_ubfactor as f64).powf(1.0 / (3.0_f64).ln()) as f32;
     let mut ubvec = vec![ubvec_val];
 
-    // tpwgts = [1/3, 2/3] to match the first bisection step of nparts=3
-    let mut tpwgts = vec![1.0f32 / 3.0, 2.0f32 / 3.0];
+    // target_part_weights = [1/3, 2/3] to match the first bisection step of nparts=3
+    let mut target_part_weights = vec![1.0f32 / 3.0, 2.0f32 / 3.0];
 
     let mut edgecut: idx_t = 0;
     let mut part = vec![0 as idx_t; n];
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy_vec.as_mut_ptr(),
+            adjacency_vec.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),
             &mut nparts,
-            tpwgts.as_mut_ptr(),
+            target_part_weights.as_mut_ptr(),
             ubvec.as_mut_ptr(),
             options.as_mut_ptr(),
             &mut edgecut,
@@ -568,7 +568,7 @@ fn debug_c_recursive_grid15_first_bisection() {
         )
     };
 
-    eprintln!("DEBUG C first bisection (nparts=2, tpwgts=[1/3, 2/3]): ret={}, edgecut={}, part={:?}",
+    eprintln!("DEBUG C first bisection (nparts=2, target_part_weights=[1/3, 2/3]): ret={}, edgecut={}, part={:?}",
         ret, edgecut, part);
 
     // Part 0 should have ~5 vertices (1/3 of 15)
@@ -605,7 +605,7 @@ fn debug_c_recursive_grid15_second_bisection() {
     // sub 8 (orig 11): [6, 10, 12] → [sub 5, sub 7, sub 9]
     // sub 9 (orig 12): [7, 11] → [sub 6, sub 8]  (orig neighbor 13 removed)
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 8, 9, 12, 16, 19, 21, 24, 26];
-    let mut adjncy: Vec<idx_t> = vec![
+    let mut adjacency: Vec<idx_t> = vec![
         1, 4,           // sub 0
         0, 2, 5,        // sub 1
         1, 3, 6,        // sub 2
@@ -618,7 +618,7 @@ fn debug_c_recursive_grid15_second_bisection() {
         6, 8,           // sub 9
     ];
 
-    let mut nvtxs: idx_t = 10;
+    let mut num_vertices: idx_t = 10;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -637,15 +637,15 @@ fn debug_c_recursive_grid15_second_bisection() {
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),
             &mut nparts,
-            ptr::null_mut(), // tpwgts: uniform [1/2, 1/2]
+            ptr::null_mut(), // target_part_weights: uniform [1/2, 1/2]
             ubvec.as_mut_ptr(),
             options.as_mut_ptr(),
             &mut edgecut,
@@ -665,7 +665,7 @@ fn debug_c_recursive_grid15_second_bisection() {
 fn debug_c_recursive_10v_with_state_700() {
     // Same 10v subgraph as debug_c_recursive_grid15_second_bisection
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 8, 9, 12, 16, 19, 21, 24, 26];
-    let mut adjncy: Vec<idx_t> = vec![
+    let mut adjacency: Vec<idx_t> = vec![
         1, 4,           // sub 0
         0, 2, 5,        // sub 1
         1, 3, 6,        // sub 2
@@ -678,7 +678,7 @@ fn debug_c_recursive_10v_with_state_700() {
         6, 8,           // sub 9
     ];
 
-    let mut nvtxs: idx_t = 10;
+    let mut num_vertices: idx_t = 10;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -697,10 +697,10 @@ fn debug_c_recursive_10v_with_state_700() {
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),
@@ -763,76 +763,76 @@ fn debug_c_recursive_10v_reordered() {
     // sub 6 (orig 7): neighbors from parent [12, 2, 6, 8] → 8=Part0 → [9, 2, 5]
     // Wait, the outer-coarsened adjacency for v7 is [12, 2, 6, 8]. Let me check.
     //
-    // Outer coarsened adjncy (from debug):
+    // Outer coarsened adjacency (from debug):
     // [5, 1, 6, 0, 2, 7, 1, 3, 8, 2, 4, 9, 3, 10, 0, 6, 11, 1, 5, 7, 12, 2, 6, 8, 13, 3, 7, 9, 14, 4, 8, 11, 5, 12, 6, 10, 13, 7, 11, 14, 8, 12, 13, 9]
     // xadj=[0, 2, 5, 8, 11, 13, 16, 20, 24, 28, 31, 33, 36, 39, 42, 44]
     //
-    // v7 (xadj[7..8] = [20, 24]): adjncy[20..24] = [12, 2, 6, 8]
+    // v7 (xadj[7..8] = [20, 24]): adjacency[20..24] = [12, 2, 6, 8]
     // But 8 is in Part0! So filter: [12→sub9, 2→sub2, 6→sub5] = [9, 2, 5]
     //
-    // v9 (xadj[9..10] = [28, 31]): adjncy[28..31] = [14, 4, 8]
+    // v9 (xadj[9..10] = [28, 31]): adjacency[28..31] = [14, 4, 8]
     // But 4=Part0, 8=Part0, 14=Part0! So filter: nothing → [] (isolated vertex?!)
-    // Wait, v9 is NOT in the right subgraph! where_[9]=0 (Part0). Skip.
+    // Wait, v9 is NOT in the right subgraph! partition[9]=0 (Part0). Skip.
     //
     // Let me recheck. where=[1,1,1,1,0,1,1,1,0,0,1,1,1,0,0]
     // Part0 (where=0): {4, 8, 9, 13, 14}
     // Right subgraph (where=1): {0, 1, 2, 3, 5, 6, 7, 10, 11, 12}
     //
-    // v10 (xadj[10..11] = [31, 33]): adjncy[31..33] = [5, 11]
+    // v10 (xadj[10..11] = [31, 33]): adjacency[31..33] = [5, 11]
     // Both in right → [sub4, sub8] = [4, 8]
     //
-    // v11 (xadj[11..12] = [33, 36]): adjncy[33..36] = [12, 6, 10]
+    // v11 (xadj[11..12] = [33, 36]): adjacency[33..36] = [12, 6, 10]
     // Wait, that's [12→sub9, 6→sub5, 10→sub7] = [9, 5, 7]
     // Hmm, that doesn't match my earlier calculation. Let me recheck.
     //
     // Actually, I need the adjacency from the graph that enters init_kway_partition.
     // From debug:
-    // adjncy=[5, 1, 6, 0, 2, 7, 1, 3, 8, 2, 4, 9, 3, 10, 0, 6, 11, 1, 5, 7, 12, 2, 6, 8, 13, 3, 7, 9, 14, 4, 8, 11, 5, 12, 6, 10, 13, 7, 11, 14, 8, 12, 13, 9]
+    // adjacency=[5, 1, 6, 0, 2, 7, 1, 3, 8, 2, 4, 9, 3, 10, 0, 6, 11, 1, 5, 7, 12, 2, 6, 8, 13, 3, 7, 9, 14, 4, 8, 11, 5, 12, 6, 10, 13, 7, 11, 14, 8, 12, 13, 9]
     //
-    // v0:  adjncy[0..2]   = [5, 1]
-    // v1:  adjncy[2..5]   = [6, 0, 2]
-    // v2:  adjncy[5..8]   = [7, 1, 3]
-    // v3:  adjncy[8..11]  = [8, 2, 4]     → remove 8(P0), 4(P0) → keep [2]
-    // v4:  adjncy[11..13] = [9, 3]         → v4 is Part0, skip
-    // v5:  adjncy[13..16] = [10, 0, 6]
-    // v6:  adjncy[16..20] = [11, 1, 5, 7]
-    // v7:  adjncy[20..24] = [12, 2, 6, 8]  → remove 8(P0) → keep [12, 2, 6]
-    // v8:  adjncy[24..28] = [13, 3, 7, 9]  → v8 is Part0, skip
-    // v9:  adjncy[28..31] = [14, 4, 8]     → v9 is Part0, skip
-    // v10: adjncy[31..33] = [5, 11]
-    // v11: adjncy[33..36] = [12, 6, 10]
+    // v0:  adjacency[0..2]   = [5, 1]
+    // v1:  adjacency[2..5]   = [6, 0, 2]
+    // v2:  adjacency[5..8]   = [7, 1, 3]
+    // v3:  adjacency[8..11]  = [8, 2, 4]     → remove 8(P0), 4(P0) → keep [2]
+    // v4:  adjacency[11..13] = [9, 3]         → v4 is Part0, skip
+    // v5:  adjacency[13..16] = [10, 0, 6]
+    // v6:  adjacency[16..20] = [11, 1, 5, 7]
+    // v7:  adjacency[20..24] = [12, 2, 6, 8]  → remove 8(P0) → keep [12, 2, 6]
+    // v8:  adjacency[24..28] = [13, 3, 7, 9]  → v8 is Part0, skip
+    // v9:  adjacency[28..31] = [14, 4, 8]     → v9 is Part0, skip
+    // v10: adjacency[31..33] = [5, 11]
+    // v11: adjacency[33..36] = [12, 6, 10]
     //
     // Wait, let me recheck v11. xadj[11]=33, xadj[12]=36.
-    // adjncy[33..36] = [12, 6, 10]
+    // adjacency[33..36] = [12, 6, 10]
     // But the outer coarsened adjacency has v11 neighbors as... let me recount.
     // xadj=[0, 2, 5, 8, 11, 13, 16, 20, 24, 28, 31, 33, 36, 39, 42, 44]
     //        v0 v1 v2 v3 v4 v5  v6  v7  v8  v9 v10 v11 v12 v13 v14
-    // v11: xadj[11..12] = [33, 36], adjncy[33..36] = ...
-    // adjncy index 33: let me count. adjncy has 44 entries.
+    // v11: xadj[11..12] = [33, 36], adjacency[33..36] = ...
+    // adjacency index 33: let me count. adjacency has 44 entries.
     // [5, 1, | 6, 0, 2, | 7, 1, 3, | 8, 2, 4, | 9, 3, | 10, 0, 6, | 11, 1, 5, 7, | 12, 2, 6, 8, | 13, 3, 7, 9, | 14, 4, 8, | 5, 11, | 12, 6, 10, | 13, 7, 11, | 14, 8, 12, | 13, 9]
     //  0  1    2  3  4    5  6  7    8  9 10   11 12   13 14 15   16 17 18 19   20 21 22 23   24 25 26 27   28 29 30   31 32   33 34 35   36 37 38   39 40 41   42 43
     //
-    // v10: xadj[10]=31, xadj[11]=33. adjncy[31..33] = [5, 11] → Hmm, but in the original grid, v10's neighbors are [5, 11]. Wait, the original grid:
+    // v10: xadj[10]=31, xadj[11]=33. adjacency[31..33] = [5, 11] → Hmm, but in the original grid, v10's neighbors are [5, 11]. Wait, the original grid:
     // v10 (row 2, col 0): up(5), right(11) → [5, 11]
     // And the outer-coarsened graph has v10: [5, 11] (both in right subgraph)
     // So sub7 (orig 10): neighbors = [4, 8] (5→sub4, 11→sub8)
     //
-    // v11: xadj[11]=33, xadj[12]=36. adjncy[33..36] = [12, 6, 10]
+    // v11: xadj[11]=33, xadj[12]=36. adjacency[33..36] = [12, 6, 10]
     // But v11 in the original grid: up(6), left(10), right(12) → [6, 10, 12]
     // After outer coarsening: the order is [12, 6, 10]!
     // This is because outer CreateCoarseGraph reordered: [6, 10, 12] → self-loop removal → first becomes last → [12, 6, 10]
     //
     // Wait, that's not how it works for vertices that aren't self-loops. Let me think again.
     // For v11 in outer CreateCoarseGraph:
-    // v11 is self-matched (match_[11]=11)
-    // cv = cmap[11] = 11
+    // v11 is self-matched (matching[11]=11)
+    // cv = coarse_map[11] = 11
     // Self-loop sentinel at position 0
-    // Process edges of v=11: adjncy[33..36] of ORIGINAL graph = [6, 10, 12]
-    // Edge 0: k=cmap[6]=6, hash(6)=6, htable[6]=cnedges, cadjncy[...]=6, cnedges++
-    // Edge 1: k=cmap[10]=10, hash(10)=10, htable[10]=cnedges, cadjncy[...]=10, cnedges++
-    // Edge 2: k=cmap[12]=12, hash(12)=12, htable[12]=cnedges, cadjncy[...]=12, cnedges++
+    // Process edges of v=11: adjacency[33..36] of ORIGINAL graph = [6, 10, 12]
+    // Edge 0: k=coarse_map[6]=6, hash(6)=6, htable[6]=cnum_edges, cadjacency[...]=6, cnum_edges++
+    // Edge 1: k=coarse_map[10]=10, hash(10)=10, htable[10]=cnum_edges, cadjacency[...]=10, cnum_edges++
+    // Edge 2: k=coarse_map[12]=12, hash(12)=12, htable[12]=cnum_edges, cadjacency[...]=12, cnum_edges++
     // Adjacency: [11(self), 6, 10, 12]
-    // Self-loop removal: cadjncy[start] = cadjncy[cnedges-1] = 12
+    // Self-loop removal: cadjacency[start] = cadjacency[cnum_edges-1] = 12
     // Result: [12, 6, 10]
     //
     // So the outer coarsening reverses the first and last edges. For v11: [6, 10, 12] → [12, 6, 10].
@@ -847,7 +847,7 @@ fn debug_c_recursive_10v_reordered() {
     //
     // Let me construct the correct 10v subgraph:
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 8, 9, 12, 16, 19, 21, 24, 26];
-    let mut adjncy: Vec<idx_t> = vec![
+    let mut adjacency: Vec<idx_t> = vec![
         4, 1,           // sub 0 (orig 0): parent [5, 1] → [sub4, sub1]
         5, 0, 2,        // sub 1 (orig 1): parent [6, 0, 2] → [sub5, sub0, sub2]
         6, 1, 3,        // sub 2 (orig 2): parent [7, 1, 3] → [sub6, sub1, sub3]
@@ -860,7 +860,7 @@ fn debug_c_recursive_10v_reordered() {
         6, 8,           // sub 9 (orig 12): parent [7, 11] → remove 13 → [sub6, sub8]
     ];
     // Wait, v12 in the parent graph: xadj[12]=36, xadj[13]=39
-    // adjncy[36..39] = [13, 7, 11]
+    // adjacency[36..39] = [13, 7, 11]
     // Remove 13(Part0): [7→sub6, 11→sub8] = [6, 8]
     // But that's [6, 8]. Hmm, let me check the self-loop reorder.
     // For v12 in outer coarsening: original neighbors are [7, 11, 13]
@@ -870,7 +870,7 @@ fn debug_c_recursive_10v_reordered() {
     // So outer-coarsened v12 has [13, 7, 11]
     // In split: remove 13 → [7→sub6, 11→sub8] = [6, 8]
 
-    let mut nvtxs: idx_t = 10;
+    let mut num_vertices: idx_t = 10;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -889,10 +889,10 @@ fn debug_c_recursive_10v_reordered() {
 
     let ret = unsafe {
         METIS_PartGraphRecursive(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),
@@ -914,8 +914,8 @@ fn debug_c_recursive_10v_reordered() {
 #[test]
 fn debug_c_kway_irregular_6v() {
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 7, 11, 14, 16];
-    let mut adjncy: Vec<idx_t> = vec![1, 3, 0, 2, 3, 1, 4, 0, 1, 4, 5, 2, 3, 5, 3, 4];
-    let mut nvtxs: idx_t = 6;
+    let mut adjacency: Vec<idx_t> = vec![1, 3, 0, 2, 3, 1, 4, 0, 1, 4, 5, 2, 3, 5, 3, 4];
+    let mut num_vertices: idx_t = 6;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
 
@@ -930,10 +930,10 @@ fn debug_c_kway_irregular_6v() {
 
     let ret = unsafe {
         METIS_PartGraphKway(
-            &mut nvtxs,
+            &mut num_vertices,
             &mut ncon,
             xadj.as_mut_ptr(),
-            adjncy.as_mut_ptr(),
+            adjacency.as_mut_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
             ptr::null_mut(),

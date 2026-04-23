@@ -6,125 +6,125 @@ use crate::types::{Idx, Real};
 
 /// Neighbor info for k-way cut refinement.
 #[derive(Clone, Copy, Default, Debug)]
-pub struct CnbrInfo {
-    pub pid: Idx,
-    pub ed: Idx,
+pub struct NeighborPartInfo {
+    pub part_id: Idx,
+    pub external_degree: Idx,
 }
 
 /// Per-vertex k-way cut refinement info.
 #[derive(Clone, Default, Debug)]
-pub struct CKRInfo {
-    pub id: Idx,
-    pub ed: Idx,
-    pub nnbrs: Idx,
-    pub inbr: i32, // index into cnbrpool, or -1
+pub struct KwayCutInfo {
+    pub internal_degree: Idx,
+    pub external_degree: Idx,
+    pub num_neighbors: Idx,
+    pub neighbor_offset: i32, // index into neighbor_pool, or -1
 }
 
 /// Internal graph data structure (CSR format with partitioning state).
 pub struct GraphData {
-    pub nvtxs: Idx,
-    pub nedges: Idx, // total number of directed edges (= xadj[nvtxs])
-    pub ncon: Idx,
+    pub num_vertices: Idx,
+    pub num_edges: Idx, // total number of directed edges (= xadj[num_vertices])
+    pub num_constraints: Idx,
 
     // CSR adjacency
     pub xadj: Vec<Idx>,
-    pub adjncy: Vec<Idx>,
-    pub vwgt: Vec<Idx>,
-    pub vsize: Vec<Idx>,
-    pub adjwgt: Vec<Idx>,
+    pub adjacency: Vec<Idx>,
+    pub vertex_weights: Vec<Idx>,
+    pub vertex_sizes: Vec<Idx>,
+    pub edge_weights: Vec<Idx>,
 
     // 2-way partition state
-    pub where_: Vec<Idx>,
-    pub pwgts: Vec<Idx>,
-    pub bndptr: Vec<Idx>, // bndptr[v] = index in bndind, or -1
-    pub bndind: Vec<Idx>, // boundary vertex list
-    pub nbnd: Idx,
-    pub id: Vec<Idx>, // internal degree
-    pub ed: Vec<Idx>, // external degree
-    pub mincut: Idx,
+    pub partition: Vec<Idx>,
+    pub part_weights: Vec<Idx>,
+    pub boundary_map: Vec<Idx>, // boundary_map[v] = index in boundary_list, or -1
+    pub boundary_list: Vec<Idx>, // boundary vertex list
+    pub num_boundary: Idx,
+    pub internal_degree: Vec<Idx>, // internal degree
+    pub external_degree: Vec<Idx>, // external degree
+    pub edge_cut: Idx,
 
     // K-way refinement info
-    pub ckrinfo: Vec<CKRInfo>,
+    pub kway_refinement_info: Vec<KwayCutInfo>,
 
-    // Coarsening map: cmap[fine_vertex] = coarse_vertex
-    pub cmap: Vec<Idx>,
-    // match_[v] = matching partner, or v for self-match
-    pub match_: Vec<Idx>,
+    // Coarsening map: coarse_map[fine_vertex] = coarse_vertex
+    pub coarse_map: Vec<Idx>,
+    // matching[v] = matching partner, or v for self-match
+    pub matching: Vec<Idx>,
 
     // Multi-level chain
     pub coarser: Option<Box<GraphData>>,
     pub finer: *mut GraphData, // raw back-pointer
 
     // Graph-level metadata
-    pub tvwgt: Vec<Idx>,     // total vertex weight per constraint
-    pub invtvwgt: Vec<Real>, // 1.0 / tvwgt
+    pub total_vertex_weight: Vec<Idx>,     // total vertex weight per constraint
+    pub inv_total_vertex_weight: Vec<Real>, // 1.0 / total_vertex_weight
     pub label: Vec<Idx>,     // original vertex labels (for recursive bisection)
 }
 
 impl GraphData {
     pub fn new() -> Self {
         GraphData {
-            nvtxs: 0,
-            nedges: 0,
-            ncon: 1,
+            num_vertices: 0,
+            num_edges: 0,
+            num_constraints: 1,
             xadj: Vec::new(),
-            adjncy: Vec::new(),
-            vwgt: Vec::new(),
-            vsize: Vec::new(),
-            adjwgt: Vec::new(),
-            where_: Vec::new(),
-            pwgts: Vec::new(),
-            bndptr: Vec::new(),
-            bndind: Vec::new(),
-            nbnd: 0,
-            id: Vec::new(),
-            ed: Vec::new(),
-            mincut: 0,
-            ckrinfo: Vec::new(),
-            cmap: Vec::new(),
-            match_: Vec::new(),
+            adjacency: Vec::new(),
+            vertex_weights: Vec::new(),
+            vertex_sizes: Vec::new(),
+            edge_weights: Vec::new(),
+            partition: Vec::new(),
+            part_weights: Vec::new(),
+            boundary_map: Vec::new(),
+            boundary_list: Vec::new(),
+            num_boundary: 0,
+            internal_degree: Vec::new(),
+            external_degree: Vec::new(),
+            edge_cut: 0,
+            kway_refinement_info: Vec::new(),
+            coarse_map: Vec::new(),
+            matching: Vec::new(),
             coarser: None,
             finer: std::ptr::null_mut(),
-            tvwgt: Vec::new(),
-            invtvwgt: Vec::new(),
+            total_vertex_weight: Vec::new(),
+            inv_total_vertex_weight: Vec::new(),
             label: Vec::new(),
         }
     }
 
     /// Insert vertex into boundary list.
-    pub fn bnd_insert(&mut self, v: usize) {
-        let pos = self.nbnd;
-        self.bndind[pos as usize] = v as Idx;
-        self.bndptr[v] = pos;
-        self.nbnd += 1;
+    pub fn add_to_boundary(&mut self, v: usize) {
+        let pos = self.num_boundary;
+        self.boundary_list[pos as usize] = v as Idx;
+        self.boundary_map[v] = pos;
+        self.num_boundary += 1;
     }
 
     /// Delete vertex from boundary list.
-    pub fn bnd_delete(&mut self, v: usize) {
-        let pos = self.bndptr[v];
+    pub fn remove_from_boundary(&mut self, v: usize) {
+        let pos = self.boundary_map[v];
         if pos == -1 {
             return;
         }
-        self.nbnd -= 1;
-        let last = self.nbnd;
+        self.num_boundary -= 1;
+        let last = self.num_boundary;
         if pos != last {
-            let moved_vtx = self.bndind[last as usize] as usize;
-            self.bndind[pos as usize] = moved_vtx as Idx;
-            self.bndptr[moved_vtx] = pos;
+            let moved_vtx = self.boundary_list[last as usize] as usize;
+            self.boundary_list[pos as usize] = moved_vtx as Idx;
+            self.boundary_map[moved_vtx] = pos;
         }
-        self.bndptr[v] = -1;
+        self.boundary_map[v] = -1;
     }
 
     /// Allocate 2-way partition memory.
     pub fn alloc_2way(&mut self) {
-        let n = self.nvtxs as usize;
-        let ncon = self.ncon as usize;
-        self.where_ = vec![0; n];
-        self.pwgts = vec![0; 2 * ncon];
-        self.bndptr = vec![-1; n];
-        self.bndind = vec![0; n];
-        self.nbnd = 0;
-        self.id = vec![0; n];
-        self.ed = vec![0; n];
+        let n = self.num_vertices as usize;
+        let ncon = self.num_constraints as usize;
+        self.partition = vec![0; n];
+        self.part_weights = vec![0; 2 * ncon];
+        self.boundary_map = vec![-1; n];
+        self.boundary_list = vec![0; n];
+        self.num_boundary = 0;
+        self.internal_degree = vec![0; n];
+        self.external_degree = vec![0; n];
     }
 }

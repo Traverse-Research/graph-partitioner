@@ -1,6 +1,6 @@
 use crate::types::{Idx, Result};
 use crate::Graph;
-use crate::ctrl::Ctrl;
+use crate::ctrl::Control;
 use crate::graph::setup::setup_graph;
 use crate::partition;
 
@@ -13,8 +13,8 @@ use crate::partition;
 /// 4. Compute CoarsenTo and nIparts
 /// 5. MlevelKWayPartitioning
 pub fn part_kway(graph: Graph, part: &mut [Idx]) -> Result<Idx> {
-    let ncon = graph.ncon;
-    let nparts = graph.nparts;
+    let ncon = graph.num_constraints;
+    let nparts = graph.num_parts;
 
     if nparts == 1 {
         for p in part.iter_mut() {
@@ -24,11 +24,11 @@ pub fn part_kway(graph: Graph, part: &mut [Idx]) -> Result<Idx> {
     }
 
     // Set up the control structure (is_kway = true)
-    let mut ctrl = Ctrl::new(&graph.options, ncon, nparts, true);
+    let mut ctrl = Control::new(&graph.options, ncon, nparts, true);
 
-    // Override tpwgts if user provided
-    if let Some(tp) = graph.tpwgts {
-        ctrl.set_tpwgts(tp);
+    // Override target_part_weights if user provided
+    if let Some(tp) = graph.target_part_weights {
+        ctrl.set_target_part_weights(tp);
     }
 
     // Override ubvec if user provided
@@ -40,23 +40,23 @@ pub fn part_kway(graph: Graph, part: &mut [Idx]) -> Result<Idx> {
     let mut gdata = setup_graph(
         ncon,
         graph.xadj,
-        graph.adjncy,
-        graph.vwgt,
-        graph.vsize,
-        graph.adjwgt,
+        graph.adjacency,
+        graph.vertex_weights,
+        graph.vertex_sizes,
+        graph.edge_weights,
     );
 
     // SetupKWayBalMultipliers
-    let invtvwgt = gdata.invtvwgt.clone();
-    ctrl.setup_kway_bal_multipliers(&invtvwgt);
+    let inv_total_vertex_weight = gdata.inv_total_vertex_weight.clone();
+    ctrl.setup_kway_balance_multipliers(&inv_total_vertex_weight);
 
-    // Compute CoarsenTo = max(nvtxs/(40*log2(nparts)), 30*nparts)
+    // Compute CoarsenTo = max(num_vertices/(40*log2(nparts)), 30*nparts)
     let log2_nparts = (nparts as f64).log2().max(1.0) as Idx;
-    let coarsen_to = ((gdata.nvtxs / (40 * log2_nparts)).max(30 * nparts)).max(1);
+    let coarsen_to = ((gdata.num_vertices / (40 * log2_nparts)).max(30 * nparts)).max(1);
     ctrl.coarsen_to = coarsen_to;
 
     // Compute nIparts = (CoarsenTo == 30*nparts ? 4 : 5)
-    ctrl.niparts = if coarsen_to == 30 * nparts { 4 } else { 5 };
+    ctrl.num_init_parts = if coarsen_to == 30 * nparts { 4 } else { 5 };
 
     // Run multilevel k-way partitioning
     let cut = partition::mlevel_kway_partitioning(&mut ctrl, &mut gdata, part);

@@ -1,23 +1,23 @@
 use crate::types::Idx;
-use crate::ctrl::Ctrl;
+use crate::ctrl::Control;
 use crate::graph::GraphData;
 
 #[allow(dead_code)]
 /// Find connected components within each partition.
 pub fn find_partition_induced_components(
     graph: &GraphData,
-    where_: &[Idx],
+    partition: &[Idx],
     nparts: Idx,
 ) -> (Vec<Vec<Vec<usize>>>,) {
-    let nvtxs = graph.nvtxs as usize;
+    let num_vertices = graph.num_vertices as usize;
     let np = nparts as usize;
 
     let mut components: Vec<Vec<Vec<usize>>> = vec![Vec::new(); np];
-    let mut visited = vec![false; nvtxs];
+    let mut visited = vec![false; num_vertices];
 
     for p in 0..np {
-        for i in 0..nvtxs {
-            if where_[i] as usize == p && !visited[i] {
+        for i in 0..num_vertices {
+            if partition[i] as usize == p && !visited[i] {
                 // BFS to find component
                 let mut component = Vec::new();
                 let mut queue = vec![i];
@@ -26,8 +26,8 @@ pub fn find_partition_induced_components(
                 while let Some(v) = queue.pop() {
                     component.push(v);
                     for k in graph.xadj[v] as usize..graph.xadj[v + 1] as usize {
-                        let u = graph.adjncy[k] as usize;
-                        if !visited[u] && where_[u] as usize == p {
+                        let u = graph.adjacency[k] as usize;
+                        if !visited[u] && partition[u] as usize == p {
                             visited[u] = true;
                             queue.push(u);
                         }
@@ -44,8 +44,8 @@ pub fn find_partition_induced_components(
 
 #[allow(dead_code)]
 /// Eliminate disconnected components by reassigning them to neighboring partitions.
-pub fn eliminate_components(_ctrl: &mut Ctrl, graph: &mut GraphData, nparts: Idx) {
-    let (components,) = find_partition_induced_components(graph, &graph.where_.clone(), nparts);
+pub fn eliminate_components(_ctrl: &mut Control, graph: &mut GraphData, nparts: Idx) {
+    let (components,) = find_partition_induced_components(graph, &graph.partition.clone(), nparts);
 
     for p in 0..nparts as usize {
         if components[p].len() <= 1 {
@@ -73,19 +73,19 @@ pub fn eliminate_components(_ctrl: &mut Ctrl, graph: &mut GraphData, nparts: Idx
                 let mut best_conn = 0;
 
                 for k in graph.xadj[v] as usize..graph.xadj[v + 1] as usize {
-                    let u = graph.adjncy[k] as usize;
-                    let up = graph.where_[u];
+                    let u = graph.adjacency[k] as usize;
+                    let up = graph.partition[u];
                     if up as usize != p {
                         // Count connection
-                        if graph.adjwgt[k] > best_conn {
-                            best_conn = graph.adjwgt[k];
+                        if graph.edge_weights[k] > best_conn {
+                            best_conn = graph.edge_weights[k];
                             best_part = up;
                         }
                     }
                 }
 
                 if best_part as usize != p {
-                    graph.where_[v] = best_part;
+                    graph.partition[v] = best_part;
                 }
             }
         }
