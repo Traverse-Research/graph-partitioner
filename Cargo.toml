@@ -1,0 +1,10 @@
+[package]
+name = "metis-clone"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[dev-dependencies]
+metis = { git = "https://github.com/Traverse-Research/metis-rs.git", rev = "4001083" }
+metis-sys = { git = "https://github.com/Traverse-Research/metis-rs.git", rev = "4001083", features = ["vendored"] }

@@ -1,0 +1,142 @@
+#[allow(dead_code)]
+pub mod pqueue;
+
+use crate::types::{Idx, Real};
+use crate::graph::GraphData;
+
+#[allow(dead_code)]
+/// Return the index of the maximum element.
+pub fn iargmax(n: usize, arr: &[Idx]) -> usize {
+    let mut max_idx = 0;
+    let mut max_val = arr[0];
+    for i in 1..n {
+        if arr[i] > max_val {
+            max_val = arr[i];
+            max_idx = i;
+        }
+    }
+    max_idx
+}
+
+#[allow(dead_code)]
+/// Return the index of the maximum element (Real).
+pub fn rargmax(n: usize, arr: &[Real]) -> usize {
+    let mut max_idx = 0;
+    let mut max_val = arr[0];
+    for i in 1..n {
+        if arr[i] > max_val {
+            max_val = arr[i];
+            max_idx = i;
+        }
+    }
+    max_idx
+}
+
+#[allow(dead_code)]
+/// Compute the edge-cut of a partitioning.
+pub fn compute_cut(graph: &GraphData, where_: &[Idx]) -> Idx {
+    let nvtxs = graph.nvtxs as usize;
+    let mut cut = 0;
+    for i in 0..nvtxs {
+        for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
+            if where_[i] != where_[graph.adjncy[k] as usize] {
+                cut += graph.adjwgt[k];
+            }
+        }
+    }
+    cut / 2
+}
+
+#[allow(dead_code)]
+/// Compute the total communication volume of a partitioning.
+pub fn compute_volume(graph: &GraphData, where_: &[Idx]) -> Idx {
+    let nvtxs = graph.nvtxs as usize;
+    let nparts = where_.iter().copied().max().unwrap_or(0) + 1;
+    let mut vol = 0;
+
+    let mut marker = vec![false; nparts as usize];
+
+    for i in 0..nvtxs {
+        let me = where_[i] as usize;
+        let mut cnt = 0;
+
+        for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
+            let other = where_[graph.adjncy[k] as usize] as usize;
+            if other != me && !marker[other] {
+                marker[other] = true;
+                cnt += 1;
+            }
+        }
+
+        // Clean up marker
+        for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
+            marker[where_[graph.adjncy[k] as usize] as usize] = false;
+        }
+
+        if cnt > 0 {
+            vol += graph.vsize[i] * cnt as Idx;
+        }
+    }
+
+    vol
+}
+
+#[allow(dead_code)]
+/// Bucket sort keys in increasing order, returning permutation array.
+pub fn bucket_sort_keys_inc(n: usize, max: Idx, keys: &[Idx], tperm: &mut [Idx]) {
+    if n == 0 {
+        return;
+    }
+
+    let max_usize = max as usize + 1;
+    let mut counts = vec![0usize; max_usize];
+
+    for i in 0..n {
+        counts[keys[i] as usize] += 1;
+    }
+
+    // Prefix sum
+    let mut sum = 0;
+    for i in 0..max_usize {
+        let c = counts[i];
+        counts[i] = sum;
+        sum += c;
+    }
+
+    // Place elements
+    for i in 0..n {
+        let k = keys[i] as usize;
+        tperm[counts[k]] = i as Idx;
+        counts[k] += 1;
+    }
+}
+
+#[allow(dead_code)]
+/// Compute partition weights.
+pub fn compute_partition_weights(graph: &GraphData, where_: &[Idx], nparts: Idx) -> Vec<Idx> {
+    let ncon = graph.ncon as usize;
+    let mut pwgts = vec![0 as Idx; nparts as usize * ncon];
+    for i in 0..graph.nvtxs as usize {
+        let p = where_[i] as usize;
+        for j in 0..ncon {
+            pwgts[p * ncon + j] += graph.vwgt[i * ncon + j];
+        }
+    }
+    pwgts
+}
+
+#[allow(dead_code)]
+/// Check if a 2-way partition is balanced.
+pub fn is_balanced_2way(
+    tvwgt_j: Idx,
+    pwgt0_j: Idx,
+    pwgt1_j: Idx,
+    target_ratio: Real,
+    ubfactor: Real,
+) -> bool {
+    let target0 = (tvwgt_j as Real * target_ratio) as Idx;
+    let target1 = tvwgt_j - target0;
+    let ub = ubfactor;
+
+    pwgt0_j as Real <= ub * target0 as Real && pwgt1_j as Real <= ub * target1 as Real
+}
