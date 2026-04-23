@@ -1,6 +1,6 @@
-use crate::types::{Idx, Real, NOPTIONS};
+use crate::types::{Idx, Real};
 use crate::rng::Rng;
-use crate::option::{self, Opt};
+use crate::option::Options;
 use crate::graph::NeighborPartInfo;
 
 /// Internal control structure holding parsed options and runtime state.
@@ -46,30 +46,26 @@ pub struct Control {
 }
 
 impl Control {
-    pub fn new(options: &[Idx; NOPTIONS], ncon: Idx, nparts: Idx, is_kway: bool) -> Self {
-        let get = |idx: usize, default: Idx| -> Idx {
-            if options[idx] == -1 { default } else { options[idx] }
-        };
-
+    pub fn new(options: &Options, ncon: Idx, nparts: Idx, is_kway: bool) -> Self {
         let optype: Idx = if is_kway { 0 } else { 1 };
-        let objtype = get(<option::ObjType as Opt>::INDEX, 0);
-        let ctype = get(<option::CType as Opt>::INDEX, 1);
-        let iptype = get(<option::IpType as Opt>::INDEX, 0);
-        let rtype = get(<option::RType as Opt>::INDEX, if is_kway { 1 } else { 0 });
-        let ncuts = get(<option::NCuts as Opt>::INDEX, 1);
-        let nseps = get(<option::NSeps as Opt>::INDEX, 1);
-        let niter = get(<option::NIter as Opt>::INDEX, 10);
-        let seed = get(<option::Seed as Opt>::INDEX, -1);
-        let minconn = get(<option::MinConn as Opt>::INDEX, 0) != 0;
-        let contig = get(<option::Contig as Opt>::INDEX, 0) != 0;
-        let compress = get(<option::Compress as Opt>::INDEX, 0) != 0;
-        let cc_order = get(<option::CCOrder as Opt>::INDEX, 0) != 0;
-        let prune_factor = get(<option::PFactor as Opt>::INDEX, 0);
+        let objtype = options.obj_type.map_or(0, |v| v.value());
+        let ctype = options.coarsen_type.map_or(1, |v| v.value());
+        let iptype = options.init_part_type.map_or(0, |v| v.value());
+        let rtype = options.refine_type.map_or(if is_kway { 1 } else { 0 }, |v| v.value());
+        let ncuts = options.num_cuts.unwrap_or(1);
+        let nseps = options.num_separators.unwrap_or(1);
+        let niter = options.num_iter.unwrap_or(10);
+        let seed = options.seed.unwrap_or(-1);
+        let minconn = options.minimize_connectivity.unwrap_or(false);
+        let contig = options.force_contiguous.unwrap_or(false);
+        let compress = options.compress.unwrap_or(false);
+        let cc_order = options.cc_order.unwrap_or(false);
+        let prune_factor = options.prune_factor.unwrap_or(0);
         let ufactor_default = if is_kway { 30 } else { 1 };
-        let ufactor = get(<option::UFactor as Opt>::INDEX, ufactor_default);
-        let disable_2hop = get(<option::No2Hop as Opt>::INDEX, 0) != 0;
-        let debug_level = get(<option::DbgLvl as Opt>::INDEX, 0);
-        let base_numbering = get(<option::Numbering as Opt>::INDEX, 0);
+        let ufactor = options.imbalance_factor.unwrap_or(ufactor_default);
+        let disable_2hop = options.disable_2hop.unwrap_or(false);
+        let debug_level = options.debug_level.map_or(0, |v| v.value());
+        let base_numbering = options.numbering.map_or(0, |v| v.value());
 
         let rng = Rng::new(seed);
 
@@ -132,9 +128,11 @@ impl Control {
     }
 
     /// Get next chunk of nbrs from pool.
+    /// Clamps nnbrs to min(nparts, nnbrs) matching C METIS cnbrpoolGetNext.
     pub fn alloc_neighbor_info(&mut self, nnbrs: usize) -> i32 {
+        let clamped = nnbrs.min(self.num_parts as usize);
         let pos = self.neighbor_pool_pos;
-        self.neighbor_pool_pos += nnbrs;
+        self.neighbor_pool_pos += clamped;
         // Grow pool if needed
         if self.neighbor_pool_pos > self.neighbor_pool.len() {
             self.neighbor_pool.resize(self.neighbor_pool_pos * 2, NeighborPartInfo::default());

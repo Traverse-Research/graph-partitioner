@@ -51,9 +51,7 @@ pub struct GraphData {
     // matching[v] = matching partner, or v for self-match
     pub matching: Vec<Idx>,
 
-    // Multi-level chain
-    pub coarser: Option<Box<GraphData>>,
-    pub finer: *mut GraphData, // raw back-pointer
+    // (Multi-level chain managed externally via Vec<GraphData>)
 
     // Graph-level metadata
     pub total_vertex_weight: Vec<Idx>,     // total vertex weight per constraint
@@ -83,8 +81,6 @@ impl GraphData {
             kway_refinement_info: Vec::new(),
             coarse_map: Vec::new(),
             matching: Vec::new(),
-            coarser: None,
-            finer: std::ptr::null_mut(),
             total_vertex_weight: Vec::new(),
             inv_total_vertex_weight: Vec::new(),
             label: Vec::new(),

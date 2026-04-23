@@ -6,13 +6,13 @@ use crate::graph::setup::setup_graph_total_vertex_weight;
 const HTLENGTH: usize = (1 << 13) - 1; // 8191
 
 /// Build a coarsened graph from the matching stored in graph.coarse_map and graph.matching.
-pub fn create_coarse_graph(_ctrl: &mut Control, graph: &GraphData, cnum_vertices: Idx) -> Box<GraphData> {
+pub fn create_coarse_graph(_ctrl: &mut Control, graph: &GraphData, cnum_vertices: Idx) -> GraphData {
     let num_vertices = graph.num_vertices as usize;
     let ncon = graph.num_constraints as usize;
     let cnum_vertices_usize = cnum_vertices as usize;
     let mask = HTLENGTH;
 
-    let mut cg = Box::new(GraphData::new());
+    let mut cg = GraphData::new();
     cg.num_vertices = cnum_vertices;
     cg.num_constraints = graph.num_constraints;
 

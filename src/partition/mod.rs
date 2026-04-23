@@ -32,33 +32,28 @@ pub fn mlevel_kway_partitioning(ctrl: &mut Control, graph: &mut GraphData, part:
     let graph_num_vertices = graph.num_vertices;
 
     for i in 0..ncuts {
-        // Coarsen the graph
-        coarsen_graph(ctrl, graph);
-
-        // Use raw pointers to handle the borrow checker (we need both orggraph and cgraph
-        // from the same coarsening chain simultaneously)
-        let orggraph_ptr: *mut GraphData = graph as *mut GraphData;
-        let cgraph_ptr: *mut GraphData = get_coarsest_ptr(orggraph_ptr);
-        let cgraph = unsafe { &mut *cgraph_ptr };
+        // Coarsen the graph — returns arena of coarser levels
+        let mut levels = coarsen_graph(ctrl, graph);
 
         // AllocateKWayPartitionMemory on the coarsest graph
-        let cnum_vertices = cgraph.num_vertices as usize;
-        cgraph.partition = vec![0; cnum_vertices];
-        cgraph.part_weights = vec![0; nparts as usize * cgraph.num_constraints as usize];
-        cgraph.boundary_map = vec![-1; cnum_vertices];
-        cgraph.boundary_list = vec![0; cnum_vertices];
+        let coarsest = levels.last_mut().unwrap();
+        let cnum_vertices = coarsest.num_vertices as usize;
+        coarsest.partition = vec![0; cnum_vertices];
+        coarsest.part_weights = vec![0; nparts as usize * coarsest.num_constraints as usize];
+        coarsest.boundary_map = vec![-1; cnum_vertices];
+        coarsest.boundary_list = vec![0; cnum_vertices];
 
         // InitKWayPartitioning: compute initial partition via recursive bisection
-        pmetis::init_kway_partition(ctrl, cgraph, nparts);
+        pmetis::init_kway_partition(ctrl, levels.last_mut().unwrap(), nparts);
+
         // AllocateRefinementWorkSpace: initialize neighbor_pool
         let pool_size = (2 * graph_num_edges as usize + graph_num_vertices as usize).max(1024);
         ctrl.init_neighbor_pool(pool_size);
 
         // RefineKWay: walk from coarsest to finest with k-way refinement
-        kwayrefine::refine_kway(ctrl, orggraph_ptr, cgraph);
+        kwayrefine::refine_kway(ctrl, graph, &mut levels);
 
-        // Evaluate the result on the finest graph (safe to use graph again since
-        // RefineKWay has already dropped all coarser graphs)
+        // Evaluate the result on the finest graph
         let curobj = graph.edge_cut;
         let curbal = compute_load_imbalance_diff(graph, nparts as usize, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols);
         if i == 0
@@ -106,18 +101,7 @@ fn compute_load_imbalance_diff(
     max_diff
 }
 
-/// Traverse coarsening chain to find coarsest graph (raw pointer version).
-fn get_coarsest_ptr(g: *mut GraphData) -> *mut GraphData {
-    let mut cur = g;
-    unsafe {
-        while (*cur).coarser.is_some() {
-            cur = &mut **(*cur).coarser.as_mut().unwrap() as *mut GraphData;
-        }
-    }
-    cur
-}
-
-/// Free partition refinement data from the graph (and its coarsening chain).
+/// Free partition refinement data from the graph.
 /// In C METIS this is FreeRData which frees partition, part_weights, boundary_map, boundary_list, kway_refinement_info, etc.
 fn free_rdata(graph: &mut GraphData) {
     graph.partition = Vec::new();
@@ -129,10 +113,4 @@ fn free_rdata(graph: &mut GraphData) {
     graph.external_degree = Vec::new();
     graph.num_boundary = 0;
     graph.edge_cut = 0;
-
-    // Also need to free coarsening chain graphs
-    // After RefineKWay, the coarsening chain should already be freed
-    // (ProjectKWayPartition drops each coarser graph as it goes)
-    // But if coarser still exists, drop it
-    graph.coarser = None;
 }

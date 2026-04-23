@@ -10,8 +10,9 @@ mod balance_kway;
 mod contig;
 mod minconn;
 
-pub use types::{Idx, Real, NOPTIONS, Error, NewGraphError, NewMeshError, Result};
-use option::Opt;
+pub use types::{Idx, Real, Error, NewGraphError, NewMeshError, Result};
+pub use mesh::create_graph_dual;
+pub use option::Options;
 use std::result::Result as StdResult;
 
 #[derive(Debug, PartialEq)]
@@ -25,7 +26,7 @@ pub struct Graph<'a> {
     edge_weights: Option<&'a [Idx]>,
     target_part_weights: Option<&'a [Real]>,
     ubvec: Option<&'a [Real]>,
-    options: [Idx; NOPTIONS],
+    options: Options,
 }
 
 impl<'a> Graph<'a> {
@@ -86,11 +87,11 @@ impl<'a> Graph<'a> {
             edge_weights: None,
             target_part_weights: None,
             ubvec: None,
-            options: [-1; NOPTIONS],
+            options: Options::default(),
         })
     }
 
-    pub unsafe fn new_unchecked(
+    pub fn new_unchecked(
         num_constraints: Idx,
         num_parts: Idx,
         xadj: &'a [Idx],
@@ -106,42 +107,114 @@ impl<'a> Graph<'a> {
             edge_weights: None,
             target_part_weights: None,
             ubvec: None,
-            options: [-1; NOPTIONS],
+            options: Options::default(),
         }
     }
 
-    pub fn set_vertex_weights(mut self, vertex_weights: &'a [Idx]) -> Graph<'a> {
+    pub fn set_vertex_weights(mut self, vertex_weights: &'a [Idx]) -> Self {
         self.vertex_weights = Some(vertex_weights);
         self
     }
 
-    pub fn set_vertex_sizes(mut self, vertex_sizes: &'a [Idx]) -> Graph<'a> {
+    pub fn set_vertex_sizes(mut self, vertex_sizes: &'a [Idx]) -> Self {
         self.vertex_sizes = Some(vertex_sizes);
         self
     }
 
-    pub fn set_edge_weights(mut self, edge_weights: &'a [Idx]) -> Graph<'a> {
+    pub fn set_edge_weights(mut self, edge_weights: &'a [Idx]) -> Self {
         self.edge_weights = Some(edge_weights);
         self
     }
 
-    pub fn set_target_part_weights(mut self, target_part_weights: &'a [Real]) -> Graph<'a> {
+    pub fn set_target_part_weights(mut self, target_part_weights: &'a [Real]) -> Self {
         self.target_part_weights = Some(target_part_weights);
         self
     }
 
-    pub fn set_ubvec(mut self, ubvec: &'a [Real]) -> Graph<'a> {
+    pub fn set_ubvec(mut self, ubvec: &'a [Real]) -> Self {
         self.ubvec = Some(ubvec);
         self
     }
 
-    pub fn set_options(mut self, options: &[Idx; NOPTIONS]) -> Graph<'a> {
-        self.options = *options;
+    // --- Option builder methods ---
+
+    pub fn seed(mut self, seed: Idx) -> Self {
+        self.options.seed = Some(seed);
         self
     }
 
-    pub fn set_option<O: Opt>(mut self, option: O) -> Graph<'a> {
-        self.options[O::INDEX] = option.value();
+    pub fn obj_type(mut self, obj_type: option::ObjType) -> Self {
+        self.options.obj_type = Some(obj_type);
+        self
+    }
+
+    pub fn coarsen_type(mut self, ctype: option::CType) -> Self {
+        self.options.coarsen_type = Some(ctype);
+        self
+    }
+
+    pub fn init_part_type(mut self, iptype: option::IpType) -> Self {
+        self.options.init_part_type = Some(iptype);
+        self
+    }
+
+    pub fn refine_type(mut self, rtype: option::RType) -> Self {
+        self.options.refine_type = Some(rtype);
+        self
+    }
+
+    pub fn num_iter(mut self, niter: Idx) -> Self {
+        self.options.num_iter = Some(niter);
+        self
+    }
+
+    pub fn num_cuts(mut self, ncuts: Idx) -> Self {
+        self.options.num_cuts = Some(ncuts);
+        self
+    }
+
+    pub fn num_separators(mut self, nseps: Idx) -> Self {
+        self.options.num_separators = Some(nseps);
+        self
+    }
+
+    pub fn imbalance_factor(mut self, ufactor: Idx) -> Self {
+        self.options.imbalance_factor = Some(ufactor);
+        self
+    }
+
+    pub fn minimize_connectivity(mut self, minconn: bool) -> Self {
+        self.options.minimize_connectivity = Some(minconn);
+        self
+    }
+
+    pub fn force_contiguous(mut self, contig: bool) -> Self {
+        self.options.force_contiguous = Some(contig);
+        self
+    }
+
+    pub fn compress(mut self, compress: bool) -> Self {
+        self.options.compress = Some(compress);
+        self
+    }
+
+    pub fn cc_order(mut self, cc_order: bool) -> Self {
+        self.options.cc_order = Some(cc_order);
+        self
+    }
+
+    pub fn prune_factor(mut self, pfactor: Idx) -> Self {
+        self.options.prune_factor = Some(pfactor);
+        self
+    }
+
+    pub fn debug_level(mut self, dbglvl: option::DbgLvl) -> Self {
+        self.options.debug_level = Some(dbglvl);
+        self
+    }
+
+    pub fn disable_2hop(mut self, no2hop: bool) -> Self {
+        self.options.disable_2hop = Some(no2hop);
         self
     }
 
@@ -167,7 +240,7 @@ pub struct Mesh<'a> {
     vertex_weights: Option<&'a [Idx]>,
     vertex_sizes: Option<&'a [Idx]>,
     target_part_weights: Option<&'a [Real]>,
-    options: [Idx; NOPTIONS],
+    options: Options,
 }
 
 impl<'a> Mesh<'a> {
@@ -220,11 +293,11 @@ impl<'a> Mesh<'a> {
             vertex_weights: None,
             vertex_sizes: None,
             target_part_weights: None,
-            options: [-1; NOPTIONS],
+            options: Options::default(),
         })
     }
 
-    pub unsafe fn new_unchecked(
+    pub fn new_unchecked(
         nn: Idx,
         num_parts: Idx,
         element_offsets: &'a [Idx],
@@ -239,32 +312,49 @@ impl<'a> Mesh<'a> {
             vertex_weights: None,
             vertex_sizes: None,
             target_part_weights: None,
-            options: [-1; NOPTIONS],
+            options: Options::default(),
         }
     }
 
-    pub fn set_vertex_weights(mut self, vertex_weights: &'a [Idx]) -> Mesh<'a> {
+    pub fn set_vertex_weights(mut self, vertex_weights: &'a [Idx]) -> Self {
         self.vertex_weights = Some(vertex_weights);
         self
     }
 
-    pub fn set_vertex_sizes(mut self, vertex_sizes: &'a [Idx]) -> Mesh<'a> {
+    pub fn set_vertex_sizes(mut self, vertex_sizes: &'a [Idx]) -> Self {
         self.vertex_sizes = Some(vertex_sizes);
         self
     }
 
-    pub fn set_target_part_weights(mut self, target_part_weights: &'a [Real]) -> Mesh<'a> {
+    pub fn set_target_part_weights(mut self, target_part_weights: &'a [Real]) -> Self {
         self.target_part_weights = Some(target_part_weights);
         self
     }
 
-    pub fn set_options(mut self, options: &[Idx; NOPTIONS]) -> Mesh<'a> {
-        self.options = *options;
+    // --- Option builder methods ---
+
+    pub fn seed(mut self, seed: Idx) -> Self {
+        self.options.seed = Some(seed);
         self
     }
 
-    pub fn set_option<O: Opt>(mut self, option: O) -> Mesh<'a> {
-        self.options[O::INDEX] = option.value();
+    pub fn obj_type(mut self, obj_type: option::ObjType) -> Self {
+        self.options.obj_type = Some(obj_type);
+        self
+    }
+
+    pub fn num_cuts(mut self, ncuts: Idx) -> Self {
+        self.options.num_cuts = Some(ncuts);
+        self
+    }
+
+    pub fn num_iter(mut self, niter: Idx) -> Self {
+        self.options.num_iter = Some(niter);
+        self
+    }
+
+    pub fn imbalance_factor(mut self, ufactor: Idx) -> Self {
+        self.options.imbalance_factor = Some(ufactor);
         self
     }
 
@@ -279,7 +369,7 @@ impl<'a> Mesh<'a> {
             }
             return Ok(0);
         }
-        self.options[option::Numbering::INDEX] = option::Numbering::C.value();
+        self.options.numbering = Some(option::Numbering::C);
         mesh::meshpart::part_dual(self, epart, npart)
     }
 }

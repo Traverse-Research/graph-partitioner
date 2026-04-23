@@ -8,65 +8,60 @@ const BOUNDARY_BALANCE: Idx = 2;
 
 /// RefineKWay: entry point of k-way cut-based refinement.
 ///
-/// Matches C METIS RefineKWay from kwayrefine.c:
-/// - orggraph is a raw pointer to the original (finest) graph
-/// - graph is the coarsest graph (starting point)
-/// - Walks from coarsest to finest: compute params, balance if needed, refine, project
-pub fn refine_kway(ctrl: &mut Control, orggraph: *mut GraphData, graph: &mut GraphData) {
+/// `graph` is the finest level. `levels` contains the coarser levels where
+/// `levels[0]` is the first coarser level and `levels[last]` is the coarsest
+/// (where initial partitioning was performed).
+///
+/// Walks from coarsest to finest: compute params, balance if needed, refine, project.
+pub fn refine_kway(ctrl: &mut Control, graph: &mut GraphData, levels: &mut Vec<GraphData>) {
     let niter = ctrl.num_iter;
     let nparts = ctrl.num_parts;
-
-    // Determine how many levels there are
-    let mut nlevels = 0;
-    {
-        let mut ptr: *mut GraphData = graph as *mut GraphData;
-        while ptr != orggraph {
-            let g = unsafe { &*ptr };
-            ptr = g.finer;
-            nlevels += 1;
-        }
-    }
+    let nlevels = levels.len(); // number of coarser levels
 
     // Compute the parameters of the coarsest graph
-    compute_kway_partition_params(ctrl, graph, nparts);
+    compute_kway_partition_params(ctrl, &mut levels[nlevels - 1], nparts);
 
-    // Refine each successively finer graph
-    let mut cur: *mut GraphData = graph as *mut GraphData;
-    let mut i = 0;
+    // Refine each level from coarsest to finest within the arena
+    // i goes from 0 (coarsest = levels[nlevels-1]) to nlevels-1 (levels[0])
+    for step in 0..nlevels {
+        let level_idx = nlevels - 1 - step;
 
-    loop {
-        let g = unsafe { &mut *cur };
-
-        // Balance check at deeper levels
-        if 2 * i >= nlevels && !is_balanced(ctrl, g, 0.02) {
-            compute_kway_boundary(g, nparts, BOUNDARY_BALANCE);
-            kwayfm::greedy_kway_cut_optimize(ctrl, g, 1, kwayfm::MODE_BALANCE);
-            compute_kway_boundary(g, nparts, BOUNDARY_REFINE);
+        // Balance check at deeper levels (closer to finest)
+        if 2 * step >= nlevels && !is_balanced(ctrl, &levels[level_idx], 0.02) {
+            compute_kway_boundary(&mut levels[level_idx], nparts, BOUNDARY_BALANCE);
+            kwayfm::greedy_kway_cut_optimize(ctrl, &mut levels[level_idx], 1, kwayfm::MODE_BALANCE);
+            compute_kway_boundary(&mut levels[level_idx], nparts, BOUNDARY_REFINE);
         }
 
-        kwayfm::greedy_kway_cut_optimize(ctrl, g, niter, kwayfm::MODE_REFINE);
+        kwayfm::greedy_kway_cut_optimize(ctrl, &mut levels[level_idx], niter, kwayfm::MODE_REFINE);
 
-        if cur == orggraph {
-            break;
+        // Project to finer level if not at the finest arena level
+        if level_idx > 0 {
+            let (left, right) = levels.split_at_mut(level_idx);
+            let finer = &mut left[level_idx - 1];
+            let coarser = &right[0]; // = levels[level_idx]
+            project_kway_partition(ctrl, finer, coarser);
         }
-
-        let finer_ptr = g.finer;
-        assert!(!finer_ptr.is_null(), "refine_kway: finer pointer is null before reaching orggraph");
-
-        // Project partition to finer level
-        project_kway_partition(ctrl, unsafe { &mut *finer_ptr });
-
-        cur = finer_ptr;
-        i += 1;
     }
 
+    // Final projection: from levels[0] to graph (finest)
+    project_kway_partition(ctrl, graph, &levels[0]);
+
+    // Balance check at finest level
+    if 2 * nlevels >= nlevels && !is_balanced(ctrl, graph, 0.02) {
+        compute_kway_boundary(graph, nparts, BOUNDARY_BALANCE);
+        kwayfm::greedy_kway_cut_optimize(ctrl, graph, 1, kwayfm::MODE_BALANCE);
+        compute_kway_boundary(graph, nparts, BOUNDARY_REFINE);
+    }
+
+    kwayfm::greedy_kway_cut_optimize(ctrl, graph, niter, kwayfm::MODE_REFINE);
+
     // Final balance check at the finest level
-    let g = unsafe { &mut *cur };
-    if !is_balanced(ctrl, g, 0.0) {
-        compute_kway_boundary(g, nparts, BOUNDARY_BALANCE);
-        kwayfm::greedy_kway_cut_optimize(ctrl, g, 10, kwayfm::MODE_BALANCE);
-        compute_kway_boundary(g, nparts, BOUNDARY_REFINE);
-        kwayfm::greedy_kway_cut_optimize(ctrl, g, niter, kwayfm::MODE_REFINE);
+    if !is_balanced(ctrl, graph, 0.0) {
+        compute_kway_boundary(graph, nparts, BOUNDARY_BALANCE);
+        kwayfm::greedy_kway_cut_optimize(ctrl, graph, 10, kwayfm::MODE_BALANCE);
+        compute_kway_boundary(graph, nparts, BOUNDARY_REFINE);
+        kwayfm::greedy_kway_cut_optimize(ctrl, graph, niter, kwayfm::MODE_REFINE);
     }
 }
 
@@ -170,45 +165,34 @@ pub fn compute_kway_partition_params(ctrl: &mut Control, graph: &mut GraphData, 
 
 /// ProjectKWayPartition: project partition from coarser to finer graph.
 ///
-/// Matches C METIS ProjectKWayPartition for METIS_OBJTYPE_CUT.
-fn project_kway_partition(ctrl: &mut Control, graph: &mut GraphData) {
+/// `finer` is the finer level; `coarser` is the coarser level.
+/// Uses `finer.coarse_map` to map fine vertices to coarse vertices.
+fn project_kway_partition(ctrl: &mut Control, finer: &mut GraphData, coarser: &GraphData) {
     let nparts = ctrl.num_parts as usize;
 
-    // Extract data from coarser graph before mutating
-    let (cwhere, ced_info, cedge_cut, cpart_weights) = {
-        let cgraph = graph.coarser.as_ref()
-            .expect("project_kway_partition: coarser graph is None");
-        // For optimization: coarse_map[i] will store kway_refinement_info[coarse_map[i]].external_degree
-        let ced: Vec<Idx> = (0..cgraph.num_vertices as usize)
-            .map(|v| cgraph.kway_refinement_info[v].external_degree)
-            .collect();
-        (
-            cgraph.partition.clone(),
-            ced,
-            cgraph.edge_cut,
-            cgraph.part_weights.clone(),
-        )
-    };
+    // Extract optimization hint: coarse vertex external degree
+    let ced: Vec<Idx> = (0..coarser.num_vertices as usize)
+        .map(|v| coarser.kway_refinement_info[v].external_degree)
+        .collect();
 
-    let num_vertices = graph.num_vertices as usize;
-    let ncon = graph.num_constraints as usize;
+    let num_vertices = finer.num_vertices as usize;
+    let ncon = finer.num_constraints as usize;
+
+    // Allocate kway partition memory
+    finer.part_weights = vec![0; nparts * ncon];
+    finer.boundary_map = vec![-1; num_vertices];
+    finer.boundary_list = vec![0; num_vertices];
+    finer.kway_refinement_info = vec![KwayCutInfo::default(); num_vertices];
 
     // Project partition and store ed optimization hint
-    // Allocate kway partition memory
-    graph.part_weights = vec![0; nparts * ncon];
-    graph.boundary_map = vec![-1; num_vertices];
-    graph.boundary_list = vec![0; num_vertices];
-    graph.kway_refinement_info = vec![KwayCutInfo::default(); num_vertices];
-
-    // partition[i] = cwhere[coarse_map[i]], coarse_map[i] = ced[coarse_map[i]] (optimization)
     let mut cmap_ed = vec![0 as Idx; num_vertices];
-    if graph.partition.len() != num_vertices {
-        graph.partition = vec![0; num_vertices];
+    if finer.partition.len() != num_vertices {
+        finer.partition = vec![0; num_vertices];
     }
     for i in 0..num_vertices {
-        let k = graph.coarse_map[i] as usize;
-        graph.partition[i] = cwhere[k];
-        cmap_ed[i] = ced_info[k]; // Store kway_refinement_info[coarse_map[i]].external_degree for optimization
+        let k = finer.coarse_map[i] as usize;
+        finer.partition[i] = coarser.partition[k];
+        cmap_ed[i] = ced[k];
     }
 
     // Reset neighbor_pool
@@ -220,59 +204,58 @@ fn project_kway_partition(ctrl: &mut Control, graph: &mut GraphData) {
     let mut num_boundary: Idx = 0;
 
     for i in 0..num_vertices {
-        let istart = graph.xadj[i] as usize;
-        let iend = graph.xadj[i + 1] as usize;
+        let istart = finer.xadj[i] as usize;
+        let iend = finer.xadj[i + 1] as usize;
 
         if cmap_ed[i] == 0 {
             // Interior node: coarse vertex had ed==0, all neighbors same partition
             let mut tid: Idx = 0;
             for j in istart..iend {
-                tid += graph.edge_weights[j];
+                tid += finer.edge_weights[j];
             }
-            graph.kway_refinement_info[i].internal_degree = tid;
-            graph.kway_refinement_info[i].neighbor_offset = -1;
+            finer.kway_refinement_info[i].internal_degree = tid;
+            finer.kway_refinement_info[i].neighbor_offset = -1;
         } else {
             // Potentially interface node
             let adj_count = iend - istart;
             let inbr = ctrl.alloc_neighbor_info(adj_count);
-            graph.kway_refinement_info[i].neighbor_offset = inbr;
+            finer.kway_refinement_info[i].neighbor_offset = inbr;
 
-            let me = graph.partition[i];
+            let me = finer.partition[i];
             let mut tid: Idx = 0;
             let mut ted: Idx = 0;
             let mut nnbrs: Idx = 0;
 
             for j in istart..iend {
-                let other = graph.partition[graph.adjacency[j] as usize];
+                let other = finer.partition[finer.adjacency[j] as usize];
                 if me == other {
-                    tid += graph.edge_weights[j];
+                    tid += finer.edge_weights[j];
                 } else {
-                    ted += graph.edge_weights[j];
+                    ted += finer.edge_weights[j];
                     let hk = htable[other as usize];
                     if hk == -1 {
                         htable[other as usize] = nnbrs;
                         ctrl.neighbor_pool[inbr as usize + nnbrs as usize].part_id = other;
-                        ctrl.neighbor_pool[inbr as usize + nnbrs as usize].external_degree = graph.edge_weights[j];
+                        ctrl.neighbor_pool[inbr as usize + nnbrs as usize].external_degree = finer.edge_weights[j];
                         nnbrs += 1;
                     } else {
-                        ctrl.neighbor_pool[inbr as usize + hk as usize].external_degree += graph.edge_weights[j];
+                        ctrl.neighbor_pool[inbr as usize + hk as usize].external_degree += finer.edge_weights[j];
                     }
                 }
             }
 
-            graph.kway_refinement_info[i].internal_degree = tid;
-            graph.kway_refinement_info[i].external_degree = ted;
+            finer.kway_refinement_info[i].internal_degree = tid;
+            finer.kway_refinement_info[i].external_degree = ted;
 
             if ted == 0 {
                 // Remove space: this was interior after all
-                // In C METIS: ctrl->nbrpoolcpos -= min(nparts, iend-istart)
-                graph.kway_refinement_info[i].neighbor_offset = -1;
+                finer.kway_refinement_info[i].neighbor_offset = -1;
             } else {
-                graph.kway_refinement_info[i].num_neighbors = nnbrs;
+                finer.kway_refinement_info[i].num_neighbors = nnbrs;
 
                 if ted - tid >= 0 {
-                    graph.boundary_list[num_boundary as usize] = i as Idx;
-                    graph.boundary_map[i] = num_boundary;
+                    finer.boundary_list[num_boundary as usize] = i as Idx;
+                    finer.boundary_map[i] = num_boundary;
                     num_boundary += 1;
                 }
 
@@ -284,15 +267,12 @@ fn project_kway_partition(ctrl: &mut Control, graph: &mut GraphData) {
         }
     }
 
-    graph.num_boundary = num_boundary;
-    graph.edge_cut = cedge_cut;
+    finer.num_boundary = num_boundary;
+    finer.edge_cut = coarser.edge_cut;
 
     // Copy part_weights from coarser
-    let len = cpart_weights.len().min(graph.part_weights.len());
-    graph.part_weights[..len].copy_from_slice(&cpart_weights[..len]);
-
-    // Free coarser graph
-    graph.coarser = None;
+    let len = coarser.part_weights.len().min(finer.part_weights.len());
+    finer.part_weights[..len].copy_from_slice(&coarser.part_weights[..len]);
 }
 
 /// ComputeKWayBoundary: recompute boundary based on bndtype.

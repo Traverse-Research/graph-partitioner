@@ -7,8 +7,13 @@ const COARSEN_FRACTION: f64 = 0.85;
 const UNMATCHED: Idx = -1;
 const UNMATCHED_THRESHOLD_2HOP: f64 = 0.10;
 
-/// Coarsen the graph iteratively. Returns pointer to coarsest graph.
-pub fn coarsen_graph(ctrl: &mut Control, graph: &mut GraphData) {
+/// Coarsen the graph iteratively. Returns the coarser levels as a Vec.
+///
+/// `graph` is the finest level. Its `coarse_map` is set by the matching step
+/// to map fine vertices to the first coarser level (`levels[0]`).
+/// Each `levels[i].coarse_map` maps to `levels[i+1]`.
+/// The coarsest level is `levels[levels.len() - 1]`.
+pub fn coarsen_graph(ctrl: &mut Control, graph: &mut GraphData) -> Vec<GraphData> {
     let ncon = graph.num_constraints as usize;
 
     // Check if all edge weights are equal
@@ -24,42 +29,64 @@ pub fn coarsen_graph(ctrl: &mut Control, graph: &mut GraphData) {
         ctrl.max_vertex_weight[i] = ((1.5 * graph.total_vertex_weight[i] as f64) / ctrl.coarsen_to.max(1) as f64) as Idx;
     }
 
-    let mut cur = graph as *mut GraphData;
+    let mut levels: Vec<GraphData> = Vec::new();
     let mut cur_eqewgts = eqewgts;
 
-    loop {
-        let g = unsafe { &mut *cur };
+    // First iteration: match and coarsen the finest graph
+    {
+        let num_vertices = graph.num_vertices as usize;
+        graph.coarse_map = vec![0; num_vertices];
 
+        if ctrl.coarsen_type == 1 && !cur_eqewgts && graph.num_edges > 0 {
+            matchingshem(ctrl, graph);
+        } else {
+            matchingrm(ctrl, graph);
+        }
+
+        let cnum_vertices = graph.coarse_map.iter().copied().max().unwrap_or(-1) + 1;
+        let coarse = contract::create_coarse_graph(ctrl, graph, cnum_vertices);
+
+        let continue_coarsening =
+            coarse.num_vertices > ctrl.coarsen_to
+            && (coarse.num_vertices as f64) < COARSEN_FRACTION * graph.num_vertices as f64
+            && coarse.num_edges > coarse.num_vertices / 2;
+
+        levels.push(coarse);
+
+        if !continue_coarsening {
+            return levels;
+        }
+        cur_eqewgts = false;
+    }
+
+    // Subsequent iterations: coarsen the last level in the arena
+    loop {
+        let g = levels.last_mut().unwrap();
         let num_vertices = g.num_vertices as usize;
         g.coarse_map = vec![0; num_vertices];
 
-        // Choose matching
         if ctrl.coarsen_type == 1 && !cur_eqewgts && g.num_edges > 0 {
             matchingshem(ctrl, g);
         } else {
             matchingrm(ctrl, g);
         }
 
-        // Build coarse graph
         let cnum_vertices = g.coarse_map.iter().copied().max().unwrap_or(-1) + 1;
         let coarse = contract::create_coarse_graph(ctrl, g, cnum_vertices);
-        g.coarser = Some(coarse);
-        g.coarser.as_mut().unwrap().finer = cur;
 
-        cur_eqewgts = false;
-
-        let coarser = g.coarser.as_ref().unwrap();
         let continue_coarsening =
-            coarser.num_vertices > ctrl.coarsen_to
-            && (coarser.num_vertices as f64) < COARSEN_FRACTION * g.num_vertices as f64
-            && coarser.num_edges > coarser.num_vertices / 2;
+            coarse.num_vertices > ctrl.coarsen_to
+            && (coarse.num_vertices as f64) < COARSEN_FRACTION * g.num_vertices as f64
+            && coarse.num_edges > coarse.num_vertices / 2;
+
+        levels.push(coarse);
 
         if !continue_coarsening {
             break;
         }
-
-        cur = &mut **g.coarser.as_mut().unwrap() as *mut GraphData;
     }
+
+    levels
 }
 
 /// Sorted Heavy Edge Matching (SHEM).

@@ -6,19 +6,17 @@ use crate::types::Idx;
 ///   output = (state >> 16) & 0x7fff
 pub struct Rng {
     pub state: u32,
-    pub call_count: u64,
 }
 
 impl Rng {
     pub fn new(seed: Idx) -> Self {
         let s = if seed == -1 { 4321 } else { seed as u32 };
-        Rng { state: s, call_count: 0 }
+        Rng { state: s }
     }
 
     /// Returns a random number in [0, 32767] (matches MSVC rand()).
     pub fn rand(&mut self) -> Idx {
         self.state = self.state.wrapping_mul(214013).wrapping_add(2531011);
-        self.call_count += 1;
         ((self.state >> 16) & 0x7fff) as Idx
     }
 

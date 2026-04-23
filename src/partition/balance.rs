@@ -39,7 +39,8 @@ fn compute_load_imbalance_diff(
 /// 5. For ncon > 1, use McGeneral2WayBalance (multi-constraint).
 pub fn balance_2way(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_weights: &[Real]) {
     // Step 1: already balanced?
-    if compute_load_imbalance_diff(graph, 2, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols) <= 0.0 {
+    let load_imb = compute_load_imbalance_diff(graph, 2, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols);
+    if load_imb <= 0.0 {
         return;
     }
 
@@ -47,9 +48,10 @@ pub fn balance_2way(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_weig
 
     if ncon == 1 {
         // Step 2: check if the difference is negligibly small
+        // C METIS uses integer arithmetic: 3*tvwgt[0]/nvtxs (integer division)
         let tpwgt0 = (ntarget_part_weights[0] * graph.total_vertex_weight[0] as Real) as Real;
         let diff = (tpwgt0 - graph.part_weights[0] as Real).abs();
-        let threshold = 3.0 * graph.total_vertex_weight[0] as Real / graph.num_vertices as Real;
+        let threshold = (3 * graph.total_vertex_weight[0] / graph.num_vertices) as Real;
         if diff < threshold {
             return;
         }

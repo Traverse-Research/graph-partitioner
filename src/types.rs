@@ -3,7 +3,6 @@ use std::result::Result as StdResult;
 
 pub type Idx = i32;
 pub type Real = f32;
-pub const NOPTIONS: usize = 40;
 pub type Result<T> = StdResult<T, Error>;
 
 #[derive(Debug, PartialEq, Eq)]

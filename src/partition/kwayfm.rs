@@ -86,11 +86,7 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
             let i = graph.boundary_list[perm[ii] as usize] as usize;
             if i >= num_vertices { continue; }
             let ckr = &graph.kway_refinement_info[i];
-            let scaled_gain = if ckr.num_neighbors > 0 {
-                (ckr.external_degree as f64) / (ckr.num_neighbors as f64).sqrt() - ckr.internal_degree as f64
-            } else {
-                -(ckr.internal_degree as f64)
-            };
+            let scaled_gain = compute_kway_gain(ckr.external_degree, ckr.num_neighbors, ckr.internal_degree);
             queue.insert(i as Idx, scaled_gain);
             vertex_status[i] = PQ_PRESENT;
             update_list[num_updates] = i as Idx;
@@ -213,11 +209,7 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
                 let new_nnbrs = graph.kway_refinement_info[ii].num_neighbors;
                 if me == to || me == from || old_nnbrs != new_nnbrs {
                     let ckr_ii = &graph.kway_refinement_info[ii];
-                    let scaled_gain = if ckr_ii.num_neighbors > 0 {
-                        (ckr_ii.external_degree as f64) / (ckr_ii.num_neighbors as f64).sqrt() - ckr_ii.internal_degree as f64
-                    } else {
-                        -(ckr_ii.internal_degree as f64)
-                    };
+                    let scaled_gain = compute_kway_gain(ckr_ii.external_degree, ckr_ii.num_neighbors, ckr_ii.internal_degree);
 
                     if bndtype == BOUNDARY_REFINE {
                         if vertex_status[ii] == PQ_PRESENT {
@@ -426,6 +418,20 @@ fn update_adjacent_vertex(
             graph.kway_refinement_info[vid].num_neighbors += 1;
         }
     }
+}
+
+/// Compute k-way PQ gain matching C METIS precision.
+/// C METIS computes: rgain = (nnbrs > 0 ? 1.0*ed/sqrt(nnbrs) : 0.0) - id
+/// The computation is done in double but stored in real_t (f32) before insertion
+/// into the RPQ. We replicate this by truncating to f32 precision.
+fn compute_kway_gain(ed: Idx, nnbrs: Idx, id: Idx) -> f64 {
+    let gain = if nnbrs > 0 {
+        (ed as f64) / (nnbrs as f64).sqrt() - id as f64
+    } else {
+        -(id as f64)
+    };
+    // C METIS stores gain as real_t (f32) in the RPQ. Truncate to match.
+    gain as f32 as f64
 }
 
 fn compute_load_imbalance_kway(graph: &GraphData, nparts: usize, partition_ij_balance_multipliers: &[Real]) -> Real {

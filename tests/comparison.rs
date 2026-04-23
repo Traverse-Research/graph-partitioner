@@ -16,7 +16,7 @@ fn compare_part_kway(xadj: &[i32], adjacency: &[i32], nparts: i32, seed: i32) {
 
     let r_cut = metis_clone::Graph::new(1, nparts, xadj, adjacency)
         .unwrap()
-        .set_option(metis_clone::option::Seed(seed))
+        .seed(seed)
         .part_kway(&mut r_part)
         .unwrap();
 
@@ -62,7 +62,7 @@ fn compare_part_kway_weighted(
         .unwrap()
         .set_vertex_weights(vertex_weights)
         .set_edge_weights(edge_weights)
-        .set_option(metis_clone::option::Seed(seed))
+        .seed(seed)
         .part_kway(&mut r_part)
         .unwrap();
 
@@ -90,7 +90,7 @@ fn compare_part_dual(element_offsets: &[i32], element_indices: &[i32], nn: i32, 
 
     let r_cut = metis_clone::Mesh::new(nparts, element_offsets, element_indices)
         .unwrap()
-        .set_option(metis_clone::option::Seed(seed))
+        .seed(seed)
         .part_dual(&mut r_epart, &mut r_npart)
         .unwrap();
 
@@ -116,7 +116,7 @@ fn test_trivial_2v_valid() {
     let mut part = vec![0i32; n];
     let cut = metis_clone::Graph::new(1, 2, &xadj, &adjacency)
         .unwrap()
-        .set_option(metis_clone::option::Seed(42))
+        .seed(42)
         .part_kway(&mut part)
         .unwrap();
     // Should have 2 different partitions
@@ -132,7 +132,7 @@ fn test_path_5v_valid() {
     let mut part = vec![0i32; n];
     let cut = metis_clone::Graph::new(1, 2, &xadj, &adjacency)
         .unwrap()
-        .set_option(metis_clone::option::Seed(42))
+        .seed(42)
         .part_kway(&mut part)
         .unwrap();
     for &p in &part {
@@ -149,7 +149,7 @@ fn test_grid_3x5_valid() {
         let mut part = vec![0i32; n];
         let cut = metis_clone::Graph::new(1, nparts, &xadj, &adjacency)
             .unwrap()
-            .set_option(metis_clone::option::Seed(42))
+            .seed(42)
             .part_kway(&mut part)
             .unwrap();
         for &p in &part {

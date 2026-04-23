@@ -1,5 +1,6 @@
-use crate::types::{Idx, Real, NOPTIONS};
+use crate::types::{Idx, Real};
 use crate::ctrl::Control;
+use crate::option::Options;
 use crate::graph::GraphData;
 use crate::graph::coarsen::coarsen_graph;
 use crate::partition::initpart;
@@ -32,26 +33,18 @@ pub fn init_kway_partition(ctrl: &mut Control, graph: &mut GraphData, nparts: Id
     // Create a temporary PMETIS ctrl, replicating SetupCtrl for METIS_OP_PMETIS.
     // In C METIS, InitKWayPartitioning calls METIS_PartGraphRecursive on the
     // coarsest graph, which creates a fresh ctrl with PMETIS settings.
-    let mut options = [-1 as Idx; NOPTIONS];
-
-    // options[NCUTS] = ctrl->nIparts (the niparts from the kway ctrl)
-    // In METIS_PartGraphKway, nIparts defaults to -1, then SetupCtrl sets it
-    // based on the graph. For InitKWayPartitioning, ncuts = ctrl->nIparts.
-    // If niparts is -1 (default), METIS computes it as 4 or 5 depending on
-    // whether the graph is large. We use the parent ctrl's niparts if set,
-    // otherwise default to 1 (the PMETIS ncuts default).
     let ncuts = if ctrl.num_init_parts > 0 { ctrl.num_init_parts } else { 1 };
-    options[8] = ncuts; // NCuts index = 8
-
-    // options[NITER] = ctrl->niter
-    options[7] = ctrl.num_iter; // NIter index = 7
 
     // Seed: C METIS does NOT propagate the seed to the inner PMETIS ctrl.
-    // options[SEED] remains -1, so InitRandom(-1) uses default seed 4321.
-    // Do NOT set options[9].
+    // seed remains None (default -1), so InitRandom(-1) uses default seed 4321.
+    let pmetis_options = Options {
+        num_cuts: Some(ncuts),
+        num_iter: Some(ctrl.num_iter),
+        ..Options::default()
+    };
 
     // Create PMETIS ctrl (is_kway = false => optype=1, ufactor=1, rtype=FM)
-    let mut pctrl = Control::new(&options, graph.num_constraints, nparts, false);
+    let mut pctrl = Control::new(&pmetis_options, graph.num_constraints, nparts, false);
 
     // Compute ubvec for recursive bisection:
     // ubvec[i] = pow(ctrl->imbalance_tols[i], 1.0/log(nparts))
@@ -234,24 +227,20 @@ fn multilevel_bisect(ctrl: &mut Control, graph: &mut GraphData, target_part_weig
     for i in 0..ncuts {
         // Step 2a: Make a working copy and coarsen
         let mut work = clone_graph_for_bisect(graph);
-        coarsen_graph(ctrl, &mut work);
-
-        let orggraph_ptr: *mut GraphData = &mut work as *mut GraphData;
-        let cgraph_ptr: *mut GraphData = get_coarsest_ptr(orggraph_ptr);
-        let cgraph = unsafe { &mut *cgraph_ptr };
+        let mut levels = coarsen_graph(ctrl, &mut work);
 
         // Step 2b: Compute niparts based on coarsest graph size
-        let niparts = if cgraph.num_vertices <= ctrl.coarsen_to {
+        let niparts = if levels.last().unwrap().num_vertices <= ctrl.coarsen_to {
             SMALL_NUM_INIT_PARTS
         } else {
             LARGE_NUM_INIT_PARTS
         };
 
         // Step 2c: Init2WayPartition on the coarsest graph
-        initpart::init_2way_partition(ctrl, cgraph, target_part_weights, niparts);
+        initpart::init_2way_partition(ctrl, levels.last_mut().unwrap(), target_part_weights, niparts);
 
         // Step 2d: Refine2Way - uncoarsen and refine through the chain.
-        refine2way::refine_2way(ctrl, orggraph_ptr, cgraph, target_part_weights);
+        refine2way::refine_2way(ctrl, &mut work, &mut levels, target_part_weights);
 
         // After refinement, work (orggraph) has the final partition result.
         let curobj = work.edge_cut;
@@ -328,15 +317,3 @@ fn clone_graph_for_bisect(g: &GraphData) -> GraphData {
     ng
 }
 
-/// Traverse coarsening chain to find coarsest graph (raw pointer version).
-/// This avoids borrow checker issues when we need both the finest and coarsest
-/// graphs from the same chain simultaneously.
-fn get_coarsest_ptr(g: *mut GraphData) -> *mut GraphData {
-    let mut cur = g;
-    unsafe {
-        while (*cur).coarser.is_some() {
-            cur = &mut **(*cur).coarser.as_mut().unwrap() as *mut GraphData;
-        }
-    }
-    cur
-}
