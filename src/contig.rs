@@ -2,7 +2,6 @@ use crate::types::Idx;
 use crate::ctrl::Control;
 use crate::graph::GraphData;
 
-#[allow(dead_code)]
 /// Find connected components within each partition.
 pub fn find_partition_induced_components(
     graph: &GraphData,
@@ -42,7 +41,7 @@ pub fn find_partition_induced_components(
     (components,)
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Eliminate disconnected components by reassigning them to neighboring partitions.
 pub fn eliminate_components(_ctrl: &mut Control, graph: &mut GraphData, nparts: Idx) {
     let (components,) = find_partition_induced_components(graph, &graph.partition.clone(), nparts);

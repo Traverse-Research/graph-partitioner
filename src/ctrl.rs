@@ -4,7 +4,7 @@ use crate::option::Options;
 use crate::graph::NeighborPartInfo;
 
 /// Internal control structure holding parsed options and runtime state.
-#[allow(dead_code)]
+#[expect(dead_code)]
 pub struct Control {
     pub op_type: Idx,
     pub obj_type: Idx,

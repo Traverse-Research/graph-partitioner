@@ -1,6 +1,5 @@
 use crate::types::{Idx, Real};
 
-#[allow(dead_code)]
 /// Compute load imbalance for each constraint.
 pub fn compute_load_imbalance(
     ncon: usize,
@@ -29,7 +28,7 @@ pub fn compute_load_imbalance(
     lb
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Check if the partition is balanced within tolerance.
 pub fn is_balanced(
     ncon: usize,

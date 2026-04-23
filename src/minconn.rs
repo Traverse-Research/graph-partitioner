@@ -2,7 +2,7 @@ use crate::types::Idx;
 use crate::ctrl::Control;
 use crate::graph::GraphData;
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Compute the subdomain graph (partition adjacency graph).
 pub fn compute_subdomain_graph(
     graph: &GraphData,
@@ -40,7 +40,7 @@ pub fn compute_subdomain_graph(
     (sadj, swgt)
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Try to minimize the maximum degree in the subdomain graph.
 pub fn eliminate_subdomain_edges(_ctrl: &mut Control, _graph: &mut GraphData, _nparts: Idx) {
     // This is a complex optimization that tries to reduce the

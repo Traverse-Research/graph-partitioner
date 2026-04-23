@@ -9,7 +9,7 @@ pub enum PType {
 }
 
 impl PType {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     pub(crate) fn value(self) -> Idx {
         match self {
             PType::Rb => 0,
@@ -120,7 +120,7 @@ impl DbgLvl {
 // --- Internal-only Numbering option ---
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
+#[expect(dead_code)]
 pub(crate) enum Numbering {
     C,
     Fortran,

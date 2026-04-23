@@ -12,7 +12,7 @@ const PQ_PRESENT: i8 = 1;
 const PQ_EXTRACTED: i8 = 2;
 const PQ_NOT_PRESENT: i8 = 3;
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Greedy k-way optimization entry point.
 pub fn greedy_kway_optimize(ctrl: &mut Control, graph: &mut GraphData, niter: Idx, _ffactor: Real, omode: Idx) {
     greedy_kway_cut_optimize(ctrl, graph, niter, omode);

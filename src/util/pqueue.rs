@@ -17,10 +17,12 @@ impl PQueue {
         }
     }
 
+    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.heap.len()
     }
 
+    #[allow(dead_code)]
     pub fn is_empty(&self) -> bool {
         self.heap.is_empty()
     }
@@ -72,6 +74,7 @@ impl PQueue {
         Some((node, key))
     }
 
+    #[allow(dead_code)]
     pub fn peek_top(&self) -> Option<(Idx, f64)> {
         self.heap.first().map(|&(key, node)| (node, key))
     }
@@ -96,11 +99,13 @@ impl PQueue {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_key(&self, node: Idx) -> f64 {
         let pos = self.locator[node as usize] as usize;
         self.heap[pos].0
     }
 
+    #[allow(dead_code)]
     pub fn reset(&mut self) {
         for &(_, node) in &self.heap {
             self.locator[node as usize] = -1;

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 /// 2 vertices, 1 edge: 0--1
 pub fn trivial_2v() -> (Vec<i32>, Vec<i32>) {
     let xadj = vec![0, 1, 2];

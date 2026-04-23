@@ -1,10 +1,9 @@
-#[allow(dead_code)]
 pub mod pqueue;
 
 use crate::types::{Idx, Real};
 use crate::graph::GraphData;
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Return the index of the maximum element.
 pub fn iargmax(n: usize, arr: &[Idx]) -> usize {
     let mut max_idx = 0;
@@ -18,7 +17,7 @@ pub fn iargmax(n: usize, arr: &[Idx]) -> usize {
     max_idx
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Return the index of the maximum element (Real).
 pub fn rargmax(n: usize, arr: &[Real]) -> usize {
     let mut max_idx = 0;
@@ -32,7 +31,7 @@ pub fn rargmax(n: usize, arr: &[Real]) -> usize {
     max_idx
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Compute the edge-cut of a partitioning.
 pub fn compute_cut(graph: &GraphData, partition: &[Idx]) -> Idx {
     let num_vertices = graph.num_vertices as usize;
@@ -47,7 +46,7 @@ pub fn compute_cut(graph: &GraphData, partition: &[Idx]) -> Idx {
     cut / 2
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Compute the total communication volume of a partitioning.
 pub fn compute_volume(graph: &GraphData, partition: &[Idx]) -> Idx {
     let num_vertices = graph.num_vertices as usize;
@@ -81,7 +80,7 @@ pub fn compute_volume(graph: &GraphData, partition: &[Idx]) -> Idx {
     vol
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Bucket sort keys in increasing order, returning permutation array.
 pub fn bucket_sort_keys_inc(n: usize, max: Idx, keys: &[Idx], tperm: &mut [Idx]) {
     if n == 0 {
@@ -111,7 +110,7 @@ pub fn bucket_sort_keys_inc(n: usize, max: Idx, keys: &[Idx], tperm: &mut [Idx])
     }
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Compute partition weights.
 pub fn compute_partition_weights(graph: &GraphData, partition: &[Idx], nparts: Idx) -> Vec<Idx> {
     let ncon = graph.num_constraints as usize;
@@ -125,7 +124,7 @@ pub fn compute_partition_weights(graph: &GraphData, partition: &[Idx], nparts: I
     part_weights
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 /// Check if a 2-way partition is balanced.
 pub fn is_balanced_2way(
     total_vertex_weight_j: Idx,
