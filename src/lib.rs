@@ -228,6 +228,17 @@ impl<'a> Graph<'a> {
         }
         partition::kway::part_kway(self, part)
     }
+
+    pub fn part_recursive(self, part: &mut [Idx]) -> Result<Idx> {
+        let num_vertices = self.xadj.len() - 1;
+        if self.num_parts == 1 {
+            for p in part.iter_mut().take(num_vertices) {
+                *p = 0;
+            }
+            return Ok(0);
+        }
+        partition::recursive::part_recursive(self, part)
+    }
 }
 
 #[derive(Debug, PartialEq)]

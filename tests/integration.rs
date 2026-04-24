@@ -464,6 +464,182 @@ fn diagnostic_grid10x10_dual_graph_kway_16parts() {
     compare_unweighted_kway(&xadj, &adjacency, 16, 42);
 }
 
+// ========= Production use case: dual graph with ncommon=2 + part_kway + force_contiguous =========
+
+/// Mirrors the production use case: build dual graph with ncommon=2 (shared-edge adjacency),
+/// then partition with ObjType::Cut + force_contiguous(true).
+/// Compares C METIS mesh_to_dual + Graph::part_kway vs Rust create_graph_dual + Graph::part_kway.
+fn compare_dual_ncommon2_kway_contiguous(
+    element_offsets: &[i32],
+    element_indices: &[i32],
+    nparts: i32,
+    seed: i32,
+) {
+    let ne = (element_offsets.len() - 1) as i32;
+    let nn = element_indices.iter().copied().max().unwrap_or(-1) + 1;
+
+    // Build dual graph with ncommon=2 using C METIS
+    let c_dual = metis::mesh_to_dual(element_offsets, element_indices, 2).unwrap();
+    let c_xadj = c_dual.xadj();
+    let c_adjncy = c_dual.adjncy();
+
+    // Build dual graph with ncommon=2 using Rust
+    let (r_xadj, r_adjncy) = graph_partitioner::create_graph_dual(ne, nn, element_offsets, element_indices, 2);
+
+    // Verify dual graphs match
+    assert_eq!(c_xadj, &r_xadj[..], "Dual graph xadj differs (ncommon=2, ne={}, seed={})", ne, seed);
+    assert_eq!(c_adjncy, &r_adjncy[..], "Dual graph adjncy differs (ncommon=2, ne={}, seed={})", ne, seed);
+
+    let n = c_xadj.len() - 1;
+    let mut c_part = vec![0i32; n];
+    let mut r_part = vec![0i32; n];
+
+    // Partition with C METIS: ObjType::Cut + Contig(true)
+    let c_cut = metis::Graph::new(1, nparts, c_xadj, c_adjncy)
+        .unwrap()
+        .set_option(metis::option::ObjType::Cut)
+        .set_option(metis::option::Contig(true))
+        .set_option(metis::option::Seed(seed))
+        .part_kway(&mut c_part)
+        .unwrap();
+
+    // Partition with Rust: ObjType::Cut + force_contiguous(true)
+    let r_cut = graph_partitioner::Graph::new(1, nparts, &r_xadj, &r_adjncy)
+        .unwrap()
+        .obj_type(graph_partitioner::option::ObjType::Cut)
+        .force_contiguous(true)
+        .seed(seed)
+        .part_kway(&mut r_part)
+        .unwrap();
+
+    assert_eq!(
+        c_cut, r_cut,
+        "dual ncommon=2 kway contiguous: edge cuts differ (nparts={}, seed={}): C={}, Rust={}",
+        nparts, seed, c_cut, r_cut
+    );
+    assert_eq!(
+        c_part, r_part,
+        "dual ncommon=2 kway contiguous: partitions differ (nparts={}, seed={})",
+        nparts, seed
+    );
+}
+
+/// Mirrors the production use case with part_recursive instead of part_kway.
+fn compare_dual_ncommon2_recursive(
+    element_offsets: &[i32],
+    element_indices: &[i32],
+    nparts: i32,
+    seed: i32,
+) {
+    let ne = (element_offsets.len() - 1) as i32;
+    let nn = element_indices.iter().copied().max().unwrap_or(-1) + 1;
+
+    // Build dual graph with ncommon=2 using C METIS
+    let c_dual = metis::mesh_to_dual(element_offsets, element_indices, 2).unwrap();
+    let c_xadj = c_dual.xadj();
+    let c_adjncy = c_dual.adjncy();
+
+    // Build dual graph with ncommon=2 using Rust
+    let (r_xadj, r_adjncy) = graph_partitioner::create_graph_dual(ne, nn, element_offsets, element_indices, 2);
+
+    let n = c_xadj.len() - 1;
+    let mut c_part = vec![0i32; n];
+    let mut r_part = vec![0i32; n];
+
+    // Partition with C METIS part_recursive
+    let c_cut = metis::Graph::new(1, nparts, c_xadj, c_adjncy)
+        .unwrap()
+        .set_option(metis::option::ObjType::Cut)
+        .set_option(metis::option::Seed(seed))
+        .part_recursive(&mut c_part)
+        .unwrap();
+
+    // Partition with Rust part_recursive
+    let r_cut = graph_partitioner::Graph::new(1, nparts, &r_xadj, &r_adjncy)
+        .unwrap()
+        .obj_type(graph_partitioner::option::ObjType::Cut)
+        .seed(seed)
+        .part_recursive(&mut r_part)
+        .unwrap();
+
+    assert_eq!(
+        c_cut, r_cut,
+        "dual ncommon=2 recursive: edge cuts differ (nparts={}, seed={}): C={}, Rust={}",
+        nparts, seed, c_cut, r_cut
+    );
+    assert_eq!(
+        c_part, r_part,
+        "dual ncommon=2 recursive: partitions differ (nparts={}, seed={})",
+        nparts, seed
+    );
+}
+
+#[test]
+fn production_dual_ncommon2_grid5x5_4parts() {
+    let (eoff, eind) = tri_grid_mesh(5, 5);
+    for &seed in &[42, 0] {
+        compare_dual_ncommon2_kway_contiguous(&eoff, &eind, 4, seed);
+    }
+}
+
+#[test]
+fn production_dual_ncommon2_grid10x10_8parts() {
+    let (eoff, eind) = tri_grid_mesh(10, 10);
+    compare_dual_ncommon2_kway_contiguous(&eoff, &eind, 8, 42);
+}
+
+#[test]
+fn production_dual_ncommon2_grid10x10_16parts() {
+    let (eoff, eind) = tri_grid_mesh(10, 10);
+    compare_dual_ncommon2_kway_contiguous(&eoff, &eind, 16, 42);
+}
+
+#[test]
+fn production_dual_ncommon2_sphere_4parts() {
+    let (eoff, eind) = uv_sphere_mesh(8, 16);
+    for &seed in &[42, 0] {
+        compare_dual_ncommon2_kway_contiguous(&eoff, &eind, 4, seed);
+    }
+}
+
+#[test]
+fn production_dual_ncommon2_sphere_8parts() {
+    let (eoff, eind) = uv_sphere_mesh(16, 32);
+    compare_dual_ncommon2_kway_contiguous(&eoff, &eind, 8, 42);
+}
+
+#[test]
+fn production_dual_ncommon2_torus_4parts() {
+    let (eoff, eind) = torus_mesh(16, 8);
+    for &seed in &[42, 0] {
+        compare_dual_ncommon2_kway_contiguous(&eoff, &eind, 4, seed);
+    }
+}
+
+// ========= part_recursive on dual graphs =========
+
+#[test]
+fn production_recursive_dual_ncommon2_grid5x5_4parts() {
+    let (eoff, eind) = tri_grid_mesh(5, 5);
+    for &seed in &[42, 0] {
+        compare_dual_ncommon2_recursive(&eoff, &eind, 4, seed);
+    }
+}
+
+#[test]
+fn production_recursive_dual_ncommon2_grid10x10_8parts() {
+    let (eoff, eind) = tri_grid_mesh(10, 10);
+    compare_dual_ncommon2_recursive(&eoff, &eind, 8, 42);
+}
+
+#[test]
+fn production_recursive_dual_ncommon2_sphere_4parts() {
+    let (eoff, eind) = uv_sphere_mesh(8, 16);
+    for &seed in &[42, 0] {
+        compare_dual_ncommon2_recursive(&eoff, &eind, 4, seed);
+    }
+}
+
 // Sweep different sizes and nparts to find minimal failing case
 #[test]
 fn diagnostic_dual_sweep() {

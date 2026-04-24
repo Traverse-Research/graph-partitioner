@@ -1,4 +1,5 @@
 pub mod kway;
+pub mod recursive;
 pub mod pmetis;
 pub mod initpart;
 pub mod fm;

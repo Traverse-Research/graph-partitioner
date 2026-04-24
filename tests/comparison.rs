@@ -230,6 +230,111 @@ fn compare_mc_grid_3x5_ncon3_2parts() {
     }
 }
 
+/// Helper: run part_recursive on both implementations and compare.
+fn compare_part_recursive(xadj: &[i32], adjacency: &[i32], nparts: i32, seed: i32) {
+    let n = xadj.len() - 1;
+    let mut c_part = vec![0i32; n];
+    let mut r_part = vec![0i32; n];
+
+    let c_cut = metis::Graph::new(1, nparts, xadj, adjacency)
+        .unwrap()
+        .set_option(metis::option::Seed(seed))
+        .part_recursive(&mut c_part)
+        .unwrap();
+
+    let r_cut = graph_partitioner::Graph::new(1, nparts, xadj, adjacency)
+        .unwrap()
+        .seed(seed)
+        .part_recursive(&mut r_part)
+        .unwrap();
+
+    for i in 0..n {
+        assert!(
+            r_part[i] >= 0 && r_part[i] < nparts,
+            "Rust recursive partition[{}] = {} out of range [0, {})",
+            i, r_part[i], nparts
+        );
+    }
+
+    assert_eq!(c_cut, r_cut, "Recursive edge cuts differ (seed={}, nparts={}): C={}, Rust={}", seed, nparts, c_cut, r_cut);
+    assert_eq!(c_part, r_part, "Recursive partitions differ (seed={}, nparts={})", seed, nparts);
+}
+
+// ========= part_recursive comparison tests =========
+
+#[test]
+fn compare_recursive_trivial_2v() {
+    let (xadj, adjacency) = trivial_2v();
+    for &seed in &[42, 0, 12345] {
+        compare_part_recursive(&xadj, &adjacency, 2, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_path_5v() {
+    let (xadj, adjacency) = path_5v();
+    for &seed in &[42, 0, 12345] {
+        compare_part_recursive(&xadj, &adjacency, 2, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_grid_3x5_2parts() {
+    let (xadj, adjacency) = grid_3x5();
+    for &seed in &[42, 0, 12345] {
+        compare_part_recursive(&xadj, &adjacency, 2, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_grid_3x5_3parts() {
+    let (xadj, adjacency) = grid_3x5();
+    for &seed in &[42, 0, 12345] {
+        compare_part_recursive(&xadj, &adjacency, 3, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_grid_3x5_4parts() {
+    let (xadj, adjacency) = grid_3x5();
+    for &seed in &[42, 0] {
+        compare_part_recursive(&xadj, &adjacency, 4, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_irregular_6v() {
+    let (xadj, adjacency) = irregular_6v();
+    for &seed in &[42, 0, 12345] {
+        compare_part_recursive(&xadj, &adjacency, 2, seed);
+        compare_part_recursive(&xadj, &adjacency, 3, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_grid_10x10_2parts() {
+    let (xadj, adjacency) = grid_10x10();
+    for &seed in &[42, 0] {
+        compare_part_recursive(&xadj, &adjacency, 2, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_grid_10x10_4parts() {
+    let (xadj, adjacency) = grid_10x10();
+    for &seed in &[42, 0] {
+        compare_part_recursive(&xadj, &adjacency, 4, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_grid_10x10_8parts() {
+    let (xadj, adjacency) = grid_10x10();
+    for &seed in &[42] {
+        compare_part_recursive(&xadj, &adjacency, 8, seed);
+    }
+}
+
 // ========= Validity tests (check our output is at least a valid partition) =========
 
 #[test]

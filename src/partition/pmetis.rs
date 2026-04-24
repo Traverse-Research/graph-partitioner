@@ -105,7 +105,7 @@ pub fn init_kway_partition(ctrl: &mut Control, graph: &mut GraphData, nparts: Id
 /// 3. Map partition back using label[i]: part[label[i]] = where[i] + fpart
 /// 4. If nparts > 2: SplitGraphPart, then recurse on each subgraph
 /// 5. Scale target_part_weights for recursive calls
-fn mlevel_recursive_bisection(
+pub fn mlevel_recursive_bisection(
     ctrl: &mut Control,
     graph: &mut GraphData,
     nparts: Idx,
