@@ -105,12 +105,17 @@ pub fn compute_kway_partition_params(ctrl: &mut Control, graph: &mut GraphData, 
         let mut id: Idx = 0;
         let mut ed: Idx = 0;
 
-        for j in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-            let other = graph.partition[graph.adjacency[j] as usize] as usize;
+        let ji_start = graph.xadj[i] as usize;
+        let ji_end = graph.xadj[i + 1] as usize;
+        let adj_slice = &graph.adjacency[ji_start..ji_end];
+        let ewgt_slice = &graph.edge_weights[ji_start..ji_end];
+
+        for (&neighbor, &ew) in adj_slice.iter().zip(ewgt_slice) {
+            let other = graph.partition[neighbor as usize] as usize;
             if me == other {
-                id += graph.edge_weights[j];
+                id += ew;
             } else {
-                ed += graph.edge_weights[j];
+                ed += ew;
             }
         }
 

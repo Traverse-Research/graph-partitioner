@@ -26,6 +26,7 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
 
     let mut moved = vec![-1 as Idx; num_vertices];
     let mut swaps = vec![0 as Idx; num_vertices];
+    let mut queues = [PQueue::new(num_vertices), PQueue::new(num_vertices)];
 
     for _pass in 0..niter {
         let initcut = graph.edge_cut;
@@ -34,7 +35,8 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
         let mut edge_cutorder: i32 = -1;
         let mut mindiff = (itarget_part_weights[0] - graph.part_weights[0]).abs();
 
-        let mut queues = [PQueue::new(num_vertices), PQueue::new(num_vertices)];
+        queues[0].reset();
+        queues[1].reset();
 
         // Insert boundary vertices into PQs
         let num_boundary = graph.num_boundary as usize;

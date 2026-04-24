@@ -60,23 +60,26 @@ pub fn create_coarse_graph(_ctrl: &mut Control, graph: &GraphData, cnum_vertices
         cedge_weights[cnum_edges] = 0;
         cnum_edges += 1;
 
-        // Process edges of v
-        for jj in graph.xadj[v] as usize..graph.xadj[v + 1] as usize {
-            let k = graph.coarse_map[graph.adjacency[jj] as usize] as usize;
+        // Process edges of v — use slice references to help LLVM elide bounds checks
+        let v_adj = &graph.adjacency[graph.xadj[v] as usize..graph.xadj[v + 1] as usize];
+        let v_ewgt = &graph.edge_weights[graph.xadj[v] as usize..graph.xadj[v + 1] as usize];
+        for (&neighbor, &ew) in v_adj.iter().zip(v_ewgt) {
+            let k = graph.coarse_map[neighbor as usize] as usize;
             let mut kk = k & mask;
 
             // Linear probe to find k or empty slot
             loop {
-                if htable[kk] == -1 {
+                let hv = htable[kk];
+                if hv == -1 {
                     // New neighbor
                     htable[kk] = cnum_edges as i32;
                     cadjacency[cnum_edges] = k as Idx;
-                    cedge_weights[cnum_edges] = graph.edge_weights[jj];
+                    cedge_weights[cnum_edges] = ew;
                     cnum_edges += 1;
                     break;
-                } else if cadjacency[htable[kk] as usize] == k as Idx {
+                } else if cadjacency[hv as usize] == k as Idx {
                     // Existing neighbor, accumulate weight
-                    cedge_weights[htable[kk] as usize] += graph.edge_weights[jj];
+                    cedge_weights[hv as usize] += ew;
                     break;
                 }
                 kk = (kk + 1) & mask;
@@ -85,19 +88,22 @@ pub fn create_coarse_graph(_ctrl: &mut Control, graph: &GraphData, cnum_vertices
 
         // Process edges of u (if matched pair)
         if v != u {
-            for jj in graph.xadj[u] as usize..graph.xadj[u + 1] as usize {
-                let k = graph.coarse_map[graph.adjacency[jj] as usize] as usize;
+            let u_adj = &graph.adjacency[graph.xadj[u] as usize..graph.xadj[u + 1] as usize];
+            let u_ewgt = &graph.edge_weights[graph.xadj[u] as usize..graph.xadj[u + 1] as usize];
+            for (&neighbor, &ew) in u_adj.iter().zip(u_ewgt) {
+                let k = graph.coarse_map[neighbor as usize] as usize;
                 let mut kk = k & mask;
 
                 loop {
-                    if htable[kk] == -1 {
+                    let hv = htable[kk];
+                    if hv == -1 {
                         htable[kk] = cnum_edges as i32;
                         cadjacency[cnum_edges] = k as Idx;
-                        cedge_weights[cnum_edges] = graph.edge_weights[jj];
+                        cedge_weights[cnum_edges] = ew;
                         cnum_edges += 1;
                         break;
-                    } else if cadjacency[htable[kk] as usize] == k as Idx {
-                        cedge_weights[htable[kk] as usize] += graph.edge_weights[jj];
+                    } else if cadjacency[hv as usize] == k as Idx {
+                        cedge_weights[hv as usize] += ew;
                         break;
                     }
                     kk = (kk + 1) & mask;

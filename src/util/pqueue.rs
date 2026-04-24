@@ -32,6 +32,7 @@ impl PQueue {
         n < self.locator.len() && self.locator[n] >= 0
     }
 
+    #[inline]
     pub fn insert(&mut self, node: Idx, key: f64) {
         let n = node as usize;
         debug_assert!(n < self.max_nodes);
@@ -43,6 +44,7 @@ impl PQueue {
         self.sift_up(pos);
     }
 
+    #[inline]
     pub fn delete(&mut self, node: Idx) -> f64 {
         let n = node as usize;
         let pos = self.locator[n] as usize;
@@ -65,6 +67,7 @@ impl PQueue {
         key
     }
 
+    #[inline]
     pub fn get_top(&mut self) -> Option<(Idx, f64)> {
         if self.heap.is_empty() {
             return None;
@@ -81,6 +84,7 @@ impl PQueue {
 
     /// Update node's key in-place, matching C METIS rpqUpdate exactly.
     /// If node is not in the queue, inserts it.
+    #[inline]
     pub fn update(&mut self, node: Idx, new_key: f64) {
         let n = node as usize;
         if n >= self.locator.len() || self.locator[n] < 0 {
@@ -113,6 +117,7 @@ impl PQueue {
         self.heap.clear();
     }
 
+    #[inline]
     fn sift_up(&mut self, mut pos: usize) {
         while pos > 0 {
             let parent = (pos - 1) / 2;
@@ -164,6 +169,7 @@ impl PQueue {
         true
     }
 
+    #[inline]
     fn sift_down(&mut self, mut pos: usize) {
         let n = self.heap.len();
         loop {

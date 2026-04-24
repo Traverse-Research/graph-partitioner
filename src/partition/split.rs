@@ -22,17 +22,21 @@ pub fn split_graph_part(graph: &GraphData) -> (GraphData, GraphData) {
         }
     }
 
-    // Build left subgraph
-    let mut lxadj = vec![0 as Idx; lcount as usize + 1];
-    let mut ladjacency = Vec::new();
-    let mut ledge_weights = Vec::new();
+    // Build left subgraph — pre-allocate adjacency based on edge estimate
+    let total_edges = graph.num_edges as usize;
+    let lxadj_len = lcount as usize + 1;
+    let rxadj_len = rcount as usize + 1;
+
+    let mut lxadj = vec![0 as Idx; lxadj_len];
+    let mut ladjacency = Vec::with_capacity(total_edges / 2);
+    let mut ledge_weights = Vec::with_capacity(total_edges / 2);
     let mut lvertex_weights = vec![0 as Idx; lcount as usize * ncon];
     let mut lvertex_sizes = vec![0 as Idx; lcount as usize];
     let mut llabel = vec![0 as Idx; lcount as usize];
 
-    let mut rxadj = vec![0 as Idx; rcount as usize + 1];
-    let mut radjacency = Vec::new();
-    let mut redge_weights = Vec::new();
+    let mut rxadj = vec![0 as Idx; rxadj_len];
+    let mut radjacency = Vec::with_capacity(total_edges / 2);
+    let mut redge_weights = Vec::with_capacity(total_edges / 2);
     let mut rvertex_weights = vec![0 as Idx; rcount as usize * ncon];
     let mut rvertex_sizes = vec![0 as Idx; rcount as usize];
     let mut rlabel = vec![0 as Idx; rcount as usize];
@@ -48,11 +52,13 @@ pub fn split_graph_part(graph: &GraphData) -> (GraphData, GraphData) {
             lvertex_sizes[li] = graph.vertex_sizes[i];
             llabel[li] = graph.label[i];
 
-            for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-                let nbr = graph.adjacency[k] as usize;
+            let adj_slice = &graph.adjacency[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
+            let ewgt_slice = &graph.edge_weights[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
+            for (&nbr_idx, &ew) in adj_slice.iter().zip(ewgt_slice) {
+                let nbr = nbr_idx as usize;
                 if graph.partition[nbr] == 0 {
                     ladjacency.push(map[nbr]);
-                    ledge_weights.push(graph.edge_weights[k]);
+                    ledge_weights.push(ew);
                 }
             }
             li += 1;
@@ -64,11 +70,13 @@ pub fn split_graph_part(graph: &GraphData) -> (GraphData, GraphData) {
             rvertex_sizes[ri] = graph.vertex_sizes[i];
             rlabel[ri] = graph.label[i];
 
-            for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-                let nbr = graph.adjacency[k] as usize;
+            let adj_slice = &graph.adjacency[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
+            let ewgt_slice = &graph.edge_weights[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
+            for (&nbr_idx, &ew) in adj_slice.iter().zip(ewgt_slice) {
+                let nbr = nbr_idx as usize;
                 if graph.partition[nbr] == 1 {
                     radjacency.push(map[nbr]);
-                    redge_weights.push(graph.edge_weights[k]);
+                    redge_weights.push(ew);
                 }
             }
             ri += 1;

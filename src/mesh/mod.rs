@@ -24,21 +24,33 @@ pub fn create_graph_dual(
 
     // Build dual graph using marker-based discovery (matching C METIS FindCommonElements)
     let mut xadj = vec![0 as Idx; ne_usize + 1];
-    let mut adjacency_vec = Vec::new();
+    // Pre-allocate adjacency: for triangle meshes, each element has ~3 neighbors on average
+    let mut adjacency_vec = Vec::with_capacity(ne_usize * 3);
 
     // marker[j] tracks the number of shared nodes between current element and element j
     // 0 = not yet encountered
     let mut marker = vec![0i32; ne_usize];
-    let mut nbrs: Vec<usize> = Vec::new();
+    let mut nbrs: Vec<usize> = Vec::with_capacity(64);
+
+    // SAFETY: All index computations below are bounded by the CSR structure:
+    // - element_offsets[i] .. element_offsets[i+1] are valid indices into element_indices
+    // - nptr[node] .. nptr[node+1] are valid indices into nind
+    // - nind values are element indices in [0, ne)
+    // - marker and nbrs are indexed by element indices in [0, ne)
+    // These invariants are established by build_node_element_csr and the input CSR format.
 
     for i in 0..ne_usize {
         nbrs.clear();
 
+        // Slice the element's node indices for this element
+        let elem_nodes = &element_indices[element_offsets[i] as usize..element_offsets[i + 1] as usize];
+
         // For each node of element i, find all elements sharing that node
-        for k in element_offsets[i] as usize..element_offsets[i + 1] as usize {
-            let node = element_indices[k] as usize;
-            for j_idx in nptr[node] as usize..nptr[node + 1] as usize {
-                let j = nind[j_idx] as usize;
+        for &node_idx in elem_nodes {
+            let node = node_idx as usize;
+            let node_elems = &nind[nptr[node] as usize..nptr[node + 1] as usize];
+            for &elem_idx in node_elems {
+                let j = elem_idx as usize;
                 if j == i {
                     continue;
                 }

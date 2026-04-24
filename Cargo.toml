@@ -13,3 +13,6 @@ metis-sys = { git = "https://github.com/Traverse-Research/metis-rs.git", rev = "
 [[bench]]
 name = "partition"
 harness = false
+
+[profile.release]
+debug = true

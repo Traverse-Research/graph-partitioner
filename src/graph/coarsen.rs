@@ -154,26 +154,33 @@ fn matchingshem(ctrl: &mut Control, graph: &mut GraphData) {
             let mut maxwgt: Idx = -1;
             maxidx = -1; // Will be set to partner or UNMATCHED for 2-hop candidate
 
+            let ki_start = graph.xadj[i] as usize;
+            let ki_end = graph.xadj[i + 1] as usize;
+            let adj_slice = &graph.adjacency[ki_start..ki_end];
+            let ewgt_slice = &graph.edge_weights[ki_start..ki_end];
+
             if ncon == 1 {
-                for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-                    let j = graph.adjacency[k] as usize;
+                let max_vw0 = ctrl.max_vertex_weight[0];
+                let vw_i = graph.vertex_weights[i];
+                for (a, &ew) in adj_slice.iter().zip(ewgt_slice) {
+                    let j = *a as usize;
                     if matching[j] == UNMATCHED
-                        && maxwgt < graph.edge_weights[k]
-                        && graph.vertex_weights[i] + graph.vertex_weights[j] <= ctrl.max_vertex_weight[0]
+                        && maxwgt < ew
+                        && vw_i + graph.vertex_weights[j] <= max_vw0
                     {
                         maxidx = j as i64;
-                        maxwgt = graph.edge_weights[k];
+                        maxwgt = ew;
                     }
                 }
             } else {
-                for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-                    let j = graph.adjacency[k] as usize;
+                for (a, &ew) in adj_slice.iter().zip(ewgt_slice) {
+                    let j = *a as usize;
                     if matching[j] == UNMATCHED
                         && ivec_le_sum(ncon, &graph.vertex_weights, i, j, &ctrl.max_vertex_weight)
-                        && maxwgt < graph.edge_weights[k]
+                        && maxwgt < ew
                     {
                         maxidx = j as i64;
-                        maxwgt = graph.edge_weights[k];
+                        maxwgt = ew;
                     }
                 }
             }
@@ -282,19 +289,25 @@ fn matchingrm(ctrl: &mut Control, graph: &mut GraphData) {
             // RM: find first valid unmatched neighbor
             maxidx = -1;
 
+            let ki_start = graph.xadj[i] as usize;
+            let ki_end = graph.xadj[i + 1] as usize;
+            let adj_slice = &graph.adjacency[ki_start..ki_end];
+
             if ncon == 1 {
-                for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-                    let j = graph.adjacency[k] as usize;
+                let max_vw0 = ctrl.max_vertex_weight[0];
+                let vw_i = graph.vertex_weights[i];
+                for a in adj_slice {
+                    let j = *a as usize;
                     if matching[j] == UNMATCHED
-                        && graph.vertex_weights[i] + graph.vertex_weights[j] <= ctrl.max_vertex_weight[0]
+                        && vw_i + graph.vertex_weights[j] <= max_vw0
                     {
                         maxidx = j as i64;
                         break;
                     }
                 }
             } else {
-                for k in graph.xadj[i] as usize..graph.xadj[i + 1] as usize {
-                    let j = graph.adjacency[k] as usize;
+                for a in adj_slice {
+                    let j = *a as usize;
                     if matching[j] == UNMATCHED
                         && ivec_le_sum(ncon, &graph.vertex_weights, i, j, &ctrl.max_vertex_weight)
                     {
@@ -580,6 +593,7 @@ fn matching2hop_all(
 }
 
 /// Check that vertex_weights[i*ncon..] + vertex_weights[j*ncon..] <= max_vertex_weight[..] for all constraints.
+#[inline(always)]
 fn ivec_le_sum(ncon: usize, vertex_weights: &[Idx], i: usize, j: usize, max_vertex_weight: &[Idx]) -> bool {
     for k in 0..ncon {
         if vertex_weights[i * ncon + k] + vertex_weights[j * ncon + k] > max_vertex_weight[k] {
