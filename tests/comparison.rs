@@ -14,7 +14,7 @@ fn compare_part_kway(xadj: &[i32], adjacency: &[i32], nparts: i32, seed: i32) {
         .part_kway(&mut c_part)
         .unwrap();
 
-    let r_cut = metis_clone::Graph::new(1, nparts, xadj, adjacency)
+    let r_cut = graph_partitioner::Graph::new(1, nparts, xadj, adjacency)
         .unwrap()
         .seed(seed)
         .part_kway(&mut r_part)
@@ -58,7 +58,7 @@ fn compare_part_kway_weighted(
         .part_kway(&mut c_part)
         .unwrap();
 
-    let r_cut = metis_clone::Graph::new(1, nparts, xadj, adjacency)
+    let r_cut = graph_partitioner::Graph::new(1, nparts, xadj, adjacency)
         .unwrap()
         .set_vertex_weights(vertex_weights)
         .set_edge_weights(edge_weights)
@@ -88,7 +88,7 @@ fn compare_part_dual(element_offsets: &[i32], element_indices: &[i32], nn: i32, 
         .part_dual(&mut c_epart, &mut c_npart)
         .unwrap();
 
-    let r_cut = metis_clone::Mesh::new(nparts, element_offsets, element_indices)
+    let r_cut = graph_partitioner::Mesh::new(nparts, element_offsets, element_indices)
         .unwrap()
         .seed(seed)
         .part_dual(&mut r_epart, &mut r_npart)
@@ -127,7 +127,7 @@ fn compare_part_kway_mc(
         .part_kway(&mut c_part)
         .unwrap();
 
-    let r_cut = metis_clone::Graph::new(ncon, nparts, xadj, adjacency)
+    let r_cut = graph_partitioner::Graph::new(ncon, nparts, xadj, adjacency)
         .unwrap()
         .set_vertex_weights(vertex_weights)
         .seed(seed)
@@ -237,7 +237,7 @@ fn test_trivial_2v_valid() {
     let (xadj, adjacency) = trivial_2v();
     let n = xadj.len() - 1;
     let mut part = vec![0i32; n];
-    let cut = metis_clone::Graph::new(1, 2, &xadj, &adjacency)
+    let cut = graph_partitioner::Graph::new(1, 2, &xadj, &adjacency)
         .unwrap()
         .seed(42)
         .part_kway(&mut part)
@@ -253,7 +253,7 @@ fn test_path_5v_valid() {
     let (xadj, adjacency) = path_5v();
     let n = xadj.len() - 1;
     let mut part = vec![0i32; n];
-    let cut = metis_clone::Graph::new(1, 2, &xadj, &adjacency)
+    let cut = graph_partitioner::Graph::new(1, 2, &xadj, &adjacency)
         .unwrap()
         .seed(42)
         .part_kway(&mut part)
@@ -270,7 +270,7 @@ fn test_grid_3x5_valid() {
     let n = xadj.len() - 1;
     for &nparts in &[2, 3, 4] {
         let mut part = vec![0i32; n];
-        let cut = metis_clone::Graph::new(1, nparts, &xadj, &adjacency)
+        let cut = graph_partitioner::Graph::new(1, nparts, &xadj, &adjacency)
             .unwrap()
             .seed(42)
             .part_kway(&mut part)
@@ -287,7 +287,7 @@ fn test_nparts_1_returns_zeros() {
     let (xadj, adjacency) = grid_3x5();
     let n = xadj.len() - 1;
     let mut part = vec![-1i32; n];
-    let cut = metis_clone::Graph::new(1, 1, &xadj, &adjacency)
+    let cut = graph_partitioner::Graph::new(1, 1, &xadj, &adjacency)
         .unwrap()
         .part_kway(&mut part)
         .unwrap();
@@ -301,7 +301,7 @@ fn test_mesh_nparts_1_returns_zeros() {
     let ne = element_offsets.len() - 1;
     let mut epart = vec![-1i32; ne];
     let mut npart = vec![-1i32; nn as usize];
-    let cut = metis_clone::Mesh::new(1, &element_offsets, &element_indices)
+    let cut = graph_partitioner::Mesh::new(1, &element_offsets, &element_indices)
         .unwrap()
         .part_dual(&mut epart, &mut npart)
         .unwrap();

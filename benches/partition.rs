@@ -20,7 +20,7 @@ fn bench_grid_100x100(c: &mut Criterion) {
             b.iter_batched(
                 || vec![0i32; nvertices as usize],
                 |mut part| {
-                    metis_clone::Graph::new(1, nparts, &xadj, &adjacency)
+                    graph_partitioner::Graph::new(1, nparts, &xadj, &adjacency)
                         .unwrap()
                         .seed(42)
                         .part_kway(&mut part)
@@ -65,7 +65,7 @@ fn bench_grid_300x300(c: &mut Criterion) {
             b.iter_batched(
                 || vec![0i32; nvertices as usize],
                 |mut part| {
-                    metis_clone::Graph::new(1, nparts, &xadj, &adjacency)
+                    graph_partitioner::Graph::new(1, nparts, &xadj, &adjacency)
                         .unwrap()
                         .seed(42)
                         .part_kway(&mut part)
@@ -109,7 +109,7 @@ fn bench_weighted_grid_200x200(c: &mut Criterion) {
             b.iter_batched(
                 || vec![0i32; nvertices as usize],
                 |mut part| {
-                    metis_clone::Graph::new(1, nparts, &xadj, &adjncy)
+                    graph_partitioner::Graph::new(1, nparts, &xadj, &adjncy)
                         .unwrap()
                         .set_edge_weights(&adjwgt)
                         .seed(42)
@@ -167,7 +167,7 @@ fn bench_mesh_dual(
             b.iter_batched(
                 || (vec![0i32; ne as usize], vec![0i32; nn]),
                 |(mut epart, mut npart)| {
-                    metis_clone::Mesh::new(nparts, eptr, eind)
+                    graph_partitioner::Mesh::new(nparts, eptr, eind)
                         .unwrap()
                         .seed(42)
                         .part_dual(&mut epart, &mut npart)

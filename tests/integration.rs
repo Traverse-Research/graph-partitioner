@@ -5,7 +5,7 @@ use fixtures::*;
 // ========= Test helpers =========
 
 /// Mirrors the production partition_mesh calling pattern exactly.
-/// Calls part_dual with ObjType::Cut on BOTH C metis and metis_clone,
+/// Calls part_dual with ObjType::Cut on BOTH C metis and graph_partitioner,
 /// asserts bit-identical results (edge cut, element partitions, node partitions).
 fn compare_mesh_partition(
     element_offsets: &[i32],
@@ -28,9 +28,9 @@ fn compare_mesh_partition(
         .part_dual(&mut c_epart, &mut c_npart)
         .unwrap();
 
-    let r_cut = metis_clone::Mesh::new(nparts, element_offsets, element_indices)
+    let r_cut = graph_partitioner::Mesh::new(nparts, element_offsets, element_indices)
         .unwrap()
-        .obj_type(metis_clone::option::ObjType::Cut)
+        .obj_type(graph_partitioner::option::ObjType::Cut)
         .seed(seed)
         .part_dual(&mut r_epart, &mut r_npart)
         .unwrap();
@@ -54,7 +54,7 @@ fn compare_mesh_partition(
 
 /// Mirrors the production partition_mesh function that takes raw u32 triangle indices,
 /// remaps to compact [0, N), and calls part_dual with ObjType::Cut.
-/// Asserts bit-identical results between C metis and metis_clone.
+/// Asserts bit-identical results between C metis and graph_partitioner.
 fn compare_partition_mesh_remapped(indices: &[u32], num_parts: i32, seed: i32) {
     let num_tris = indices.len() / 3;
     assert_eq!(indices.len() % 3, 0, "indices length must be a multiple of 3");
@@ -90,9 +90,9 @@ fn compare_partition_mesh_remapped(indices: &[u32], num_parts: i32, seed: i32) {
         .part_dual(&mut c_epart, &mut c_npart)
         .unwrap();
 
-    let r_cut = metis_clone::Mesh::new(num_parts, &eptr, &remapped)
+    let r_cut = graph_partitioner::Mesh::new(num_parts, &eptr, &remapped)
         .unwrap()
-        .obj_type(metis_clone::option::ObjType::Cut)
+        .obj_type(graph_partitioner::option::ObjType::Cut)
         .seed(seed)
         .part_dual(&mut r_epart, &mut r_npart)
         .unwrap();
@@ -116,7 +116,7 @@ fn compare_partition_mesh_remapped(indices: &[u32], num_parts: i32, seed: i32) {
 
 /// Mirrors the production group_component calling pattern exactly.
 /// Weighted CSR graph, part_kway with ObjType::Cut + edge weights on BOTH
-/// C metis and metis_clone, asserts bit-identical results.
+/// C metis and graph_partitioner, asserts bit-identical results.
 fn compare_weighted_kway(
     xadj: &[i32],
     adjncy: &[i32],
@@ -136,9 +136,9 @@ fn compare_weighted_kway(
         .part_kway(&mut c_part)
         .unwrap();
 
-    let r_cut = metis_clone::Graph::new(1, nparts, xadj, adjncy)
+    let r_cut = graph_partitioner::Graph::new(1, nparts, xadj, adjncy)
         .unwrap()
-        .obj_type(metis_clone::option::ObjType::Cut)
+        .obj_type(graph_partitioner::option::ObjType::Cut)
         .set_edge_weights(adjwgt)
         .seed(seed)
         .part_kway(&mut r_part)
@@ -366,9 +366,9 @@ fn compare_unweighted_kway(
         .part_kway(&mut c_part)
         .unwrap();
 
-    let r_cut = metis_clone::Graph::new(1, nparts, xadj, adjncy)
+    let r_cut = graph_partitioner::Graph::new(1, nparts, xadj, adjncy)
         .unwrap()
-        .obj_type(metis_clone::option::ObjType::Cut)
+        .obj_type(graph_partitioner::option::ObjType::Cut)
         .seed(seed)
         .part_kway(&mut r_part)
         .unwrap();
@@ -446,7 +446,7 @@ fn diagnostic_sphere_dual_graph_kway_4parts() {
     let nn = eind.iter().copied().max().unwrap_or(-1) + 1;
 
     // Build dual graph using Rust's create_graph_dual
-    let (xadj, adjacency) = metis_clone::create_graph_dual(ne, nn, &eoff, &eind, 1);
+    let (xadj, adjacency) = graph_partitioner::create_graph_dual(ne, nn, &eoff, &eind, 1);
 
     for &seed in &[42, 0] {
         compare_unweighted_kway(&xadj, &adjacency, 4, seed);
@@ -459,7 +459,7 @@ fn diagnostic_grid10x10_dual_graph_kway_16parts() {
     let ne = (eoff.len() - 1) as i32;
     let nn = eind.iter().copied().max().unwrap_or(-1) + 1;
 
-    let (xadj, adjacency) = metis_clone::create_graph_dual(ne, nn, &eoff, &eind, 1);
+    let (xadj, adjacency) = graph_partitioner::create_graph_dual(ne, nn, &eoff, &eind, 1);
 
     compare_unweighted_kway(&xadj, &adjacency, 16, 42);
 }
@@ -478,7 +478,7 @@ fn diagnostic_dual_sweep() {
         let (eoff, eind) = tri_grid_mesh(rows, cols);
         let ne = (eoff.len() - 1) as i32;
         let nn = eind.iter().copied().max().unwrap_or(-1) + 1;
-        let (xadj, adjacency) = metis_clone::create_graph_dual(ne, nn, &eoff, &eind, 1);
+        let (xadj, adjacency) = graph_partitioner::create_graph_dual(ne, nn, &eoff, &eind, 1);
 
         let n = xadj.len() - 1;
         let mut c_part = vec![0i32; n];
@@ -491,9 +491,9 @@ fn diagnostic_dual_sweep() {
             .part_kway(&mut c_part)
             .unwrap();
 
-        let r_cut = metis_clone::Graph::new(1, nparts, &xadj, &adjacency)
+        let r_cut = graph_partitioner::Graph::new(1, nparts, &xadj, &adjacency)
             .unwrap()
-            .obj_type(metis_clone::option::ObjType::Cut)
+            .obj_type(graph_partitioner::option::ObjType::Cut)
             .seed(42)
             .part_kway(&mut r_part)
             .unwrap();
