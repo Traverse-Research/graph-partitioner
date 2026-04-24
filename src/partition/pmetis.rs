@@ -46,23 +46,31 @@ pub fn init_kway_partition(ctrl: &mut Control, graph: &mut GraphData, nparts: Id
     // Create PMETIS ctrl (is_kway = false => optype=1, ufactor=1, rtype=FM)
     let mut pctrl = Control::new(&pmetis_options, graph.num_constraints, nparts, false);
 
+    // C METIS SetupCtrl for METIS_OP_PMETIS uses different defaults based on ncon:
+    //   ncon == 1: iptype=GROW(0),  ufactor=1,  CoarsenTo=20
+    //   ncon >  1: iptype=RANDOM(1), ufactor=10, CoarsenTo=100
+    if ncon > 1 {
+        pctrl.init_part_type = 1; // METIS_IPTYPE_RANDOM
+        // ufactor=10 (MCPMETIS_DEFAULT_UFACTOR) - but imbalance_tols are overridden below
+    }
+    pctrl.coarsen_to = if ncon == 1 { 20 } else { 100 };
+
     // Compute ubvec for recursive bisection:
-    // ubvec[i] = pow(ctrl->imbalance_tols[i], 1.0/log(nparts))
+    // ubvec[i] = pow(ctrl->ubfactors[i], 1.0/log(nparts))
+    // In C METIS, ctrl->ubfactors[i] already includes +0.0000499 (added in SetupCtrl).
+    // Then the inner PMETIS SetupCtrl adds +0.0000499 again to the result.
     let log_nparts = (nparts as f64).ln();
     if log_nparts > 0.0 {
         let inv_log = 1.0 / log_nparts;
         for i in 0..ncon {
-            pctrl.imbalance_tols[i] = (ctrl.imbalance_tols[i] as f64).powf(inv_log) as Real;
-            // C METIS SetupCtrl always adds 0.0000499 AFTER any ubvec override
-            pctrl.imbalance_tols[i] += 0.0000499;
+            // C: ubvec[i] = pow(ctrl->ubfactors[i], 1.0/log(nparts))
+            // ctrl->ubfactors[i] includes +0.0000499 from outer SetupCtrl.
+            // Our ctrl.imbalance_tols[i] also includes +0.0000499.
+            let base_ubfactor = ctrl.imbalance_tols[i] as f64;
+            // C: inner SetupCtrl adds +0.0000499 to ubvec result.
+            pctrl.imbalance_tols[i] = base_ubfactor.powf(inv_log) as Real + 0.0000499;
         }
     }
-
-    // C METIS SetupCtrl for METIS_OP_PMETIS hardcodes CoarsenTo:
-    //   ncon == 1: CoarsenTo = 20
-    //   ncon >  1: CoarsenTo = 100
-    // METIS_PartGraphRecursive does NOT override this value.
-    pctrl.coarsen_to = if ncon == 1 { 20 } else { 100 };
 
     // Compute target_part_weights: uniform 1/nparts for each partition and constraint
     pctrl.target_part_weights = vec![1.0 / nparts as Real; (nparts * graph.num_constraints) as usize];
@@ -138,6 +146,7 @@ fn mlevel_recursive_bisection(
 
     // Step 2: MultilevelBisect
     multilevel_bisect(ctrl, graph, &target_part_weights2);
+
     // Step 3: Map partition back using label.
     // part[label[i]] = where[i] + fpart
     for i in 0..num_vertices {

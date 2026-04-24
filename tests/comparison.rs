@@ -107,6 +107,129 @@ fn compare_part_dual(element_offsets: &[i32], element_indices: &[i32], nn: i32, 
     assert_eq!(c_npart, r_npart, "Node partitions differ (seed={}, nparts={})", seed, nparts);
 }
 
+/// Helper: run part_kway with multi-constraint weights on both implementations and compare.
+fn compare_part_kway_mc(
+    xadj: &[i32],
+    adjacency: &[i32],
+    ncon: i32,
+    vertex_weights: &[i32],
+    nparts: i32,
+    seed: i32,
+) {
+    let n = xadj.len() - 1;
+    let mut c_part = vec![0i32; n];
+    let mut r_part = vec![0i32; n];
+
+    let c_cut = metis::Graph::new(ncon, nparts, xadj, adjacency)
+        .unwrap()
+        .set_vwgt(vertex_weights)
+        .set_option(metis::option::Seed(seed))
+        .part_kway(&mut c_part)
+        .unwrap();
+
+    let r_cut = metis_clone::Graph::new(ncon, nparts, xadj, adjacency)
+        .unwrap()
+        .set_vertex_weights(vertex_weights)
+        .seed(seed)
+        .part_kway(&mut r_part)
+        .unwrap();
+
+    // Valid partitions
+    for i in 0..n {
+        assert!(
+            r_part[i] >= 0 && r_part[i] < nparts,
+            "Rust mc partition[{}] = {} out of range [0, {}) (seed={}, ncon={}, nparts={})",
+            i, r_part[i], nparts, seed, ncon, nparts
+        );
+    }
+
+    assert_eq!(
+        c_cut, r_cut,
+        "MC edge cuts differ (seed={}, ncon={}, nparts={}): C={}, Rust={}",
+        seed, ncon, nparts, c_cut, r_cut
+    );
+    assert_eq!(
+        c_part, r_part,
+        "MC partitions differ (seed={}, ncon={}, nparts={})",
+        seed, ncon, nparts
+    );
+}
+
+// ========= Multi-constraint comparison tests =========
+
+#[test]
+fn compare_mc_grid_3x5_ncon2_2parts() {
+    let (xadj, adjacency) = grid_3x5();
+    let n = xadj.len() - 1;
+    // ncon=2: vwgt[i*2+0] = 1, vwgt[i*2+1] = i+1
+    let mut vwgt = vec![0i32; n * 2];
+    for i in 0..n {
+        vwgt[i * 2] = 1;
+        vwgt[i * 2 + 1] = (i + 1) as i32;
+    }
+    for &seed in &[42, 0] {
+        compare_part_kway_mc(&xadj, &adjacency, 2, &vwgt, 2, seed);
+    }
+}
+
+#[test]
+fn compare_mc_grid_3x5_ncon2_3parts() {
+    let (xadj, adjacency) = grid_3x5();
+    let n = xadj.len() - 1;
+    let mut vwgt = vec![0i32; n * 2];
+    for i in 0..n {
+        vwgt[i * 2] = 1;
+        vwgt[i * 2 + 1] = (i + 1) as i32;
+    }
+    for &seed in &[42, 0] {
+        compare_part_kway_mc(&xadj, &adjacency, 2, &vwgt, 3, seed);
+    }
+}
+
+#[test]
+fn compare_mc_grid_10x10_ncon2_2parts() {
+    let (xadj, adjacency) = grid_10x10();
+    let n = xadj.len() - 1;
+    let mut vwgt = vec![0i32; n * 2];
+    for i in 0..n {
+        vwgt[i * 2] = 1;
+        vwgt[i * 2 + 1] = (i + 1) as i32;
+    }
+    for &seed in &[42] {
+        compare_part_kway_mc(&xadj, &adjacency, 2, &vwgt, 2, seed);
+    }
+}
+
+#[test]
+fn compare_mc_grid_10x10_ncon2_4parts() {
+    let (xadj, adjacency) = grid_10x10();
+    let n = xadj.len() - 1;
+    let mut vwgt = vec![0i32; n * 2];
+    for i in 0..n {
+        vwgt[i * 2] = 1;
+        vwgt[i * 2 + 1] = (i + 1) as i32;
+    }
+    for &seed in &[42] {
+        compare_part_kway_mc(&xadj, &adjacency, 2, &vwgt, 4, seed);
+    }
+}
+
+#[test]
+fn compare_mc_grid_3x5_ncon3_2parts() {
+    let (xadj, adjacency) = grid_3x5();
+    let n = xadj.len() - 1;
+    // ncon=3: vwgt[i*3+0] = 1, vwgt[i*3+1] = i+1, vwgt[i*3+2] = n-i
+    let mut vwgt = vec![0i32; n * 3];
+    for i in 0..n {
+        vwgt[i * 3] = 1;
+        vwgt[i * 3 + 1] = (i + 1) as i32;
+        vwgt[i * 3 + 2] = (n - i) as i32;
+    }
+    for &seed in &[42, 0] {
+        compare_part_kway_mc(&xadj, &adjacency, 3, &vwgt, 2, seed);
+    }
+}
+
 // ========= Validity tests (check our output is at least a valid partition) =========
 
 #[test]

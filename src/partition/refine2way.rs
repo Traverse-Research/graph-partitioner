@@ -1,7 +1,7 @@
 use crate::types::{Idx, Real};
 use crate::ctrl::Control;
 use crate::graph::GraphData;
-use crate::partition::fm::fm_2way_cut_refine;
+use crate::partition::fm::fm_2way_refine;
 use crate::partition::balance::balance_2way;
 use crate::partition::initpart::compute_2way_partition_params;
 
@@ -21,7 +21,7 @@ pub fn refine_2way(ctrl: &mut Control, graph: &mut GraphData, levels: &mut Vec<G
 
     // Balance and refine the coarsest level
     balance_2way(ctrl, &mut levels[nlevels - 1], target_part_weights);
-    fm_2way_cut_refine(ctrl, &mut levels[nlevels - 1], target_part_weights, niter);
+    fm_2way_refine(ctrl, &mut levels[nlevels - 1], target_part_weights, niter);
 
     // Walk from coarsest to finest within the arena
     for i in (0..nlevels - 1).rev() {
@@ -35,7 +35,7 @@ pub fn refine_2way(ctrl: &mut Control, graph: &mut GraphData, levels: &mut Vec<G
 
         // Balance and refine at this level
         balance_2way(ctrl, &mut levels[i], target_part_weights);
-        fm_2way_cut_refine(ctrl, &mut levels[i], target_part_weights, niter);
+        fm_2way_refine(ctrl, &mut levels[i], target_part_weights, niter);
     }
 
     // Final projection: from levels[0] (first coarser level) to graph (finest)
@@ -43,7 +43,7 @@ pub fn refine_2way(ctrl: &mut Control, graph: &mut GraphData, levels: &mut Vec<G
 
     // Balance and refine at the finest level
     balance_2way(ctrl, graph, target_part_weights);
-    fm_2way_cut_refine(ctrl, graph, target_part_weights, niter);
+    fm_2way_refine(ctrl, graph, target_part_weights, niter);
 }
 
 /// Project2WayPartition: project the 2-way partition from the coarser graph to the

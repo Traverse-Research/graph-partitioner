@@ -3,6 +3,157 @@ use crate::ctrl::Control;
 use crate::graph::GraphData;
 use crate::util::pqueue::PQueue;
 
+/// iargmax_nrm: returns the index of the maximum x[i]*y[i].
+/// Used to find the dominant constraint for each vertex.
+pub(crate) fn iargmax_nrm(n: usize, x: &[Idx], y: &[Real]) -> usize {
+    let mut max = 0;
+    for i in 1..n {
+        if x[i] as Real * y[i] > x[max] as Real * y[max] {
+            max = i;
+        }
+    }
+    max
+}
+
+/// iargmax2_nrm: returns the index of the second-largest x[i]*y[i].
+/// Used in McGeneral2WayBalance for empty queue redistribution.
+pub(crate) fn iargmax2_nrm(n: usize, x: &[Idx], y: &[Real]) -> usize {
+    let (mut max1, mut max2);
+    if x[0] as Real * y[0] > x[1] as Real * y[1] {
+        max1 = 0;
+        max2 = 1;
+    } else {
+        max1 = 1;
+        max2 = 0;
+    }
+    for i in 2..n {
+        if x[i] as Real * y[i] > x[max1] as Real * y[max1] {
+            max2 = max1;
+            max1 = i;
+        } else if x[i] as Real * y[i] > x[max2] as Real * y[max2] {
+            max2 = i;
+        }
+    }
+    max2
+}
+
+/// ComputeLoadImbalanceDiffVec: for each constraint, compute the max imbalance diff
+/// across all partitions, and store it in diffvec[i].
+/// Returns the overall max.
+pub(crate) fn compute_load_imbalance_diff_vec(
+    part_weights: &[Idx],
+    ncon: usize,
+    nparts: usize,
+    pijbm: &[Real],
+    ubfactors: &[Real],
+    diffvec: &mut [Real],
+) -> Real {
+    let mut max = -1.0 as Real;
+    for i in 0..ncon {
+        diffvec[i] = part_weights[i] as Real * pijbm[i] - ubfactors[i];
+        for j in 1..nparts {
+            let cur = part_weights[j * ncon + i] as Real * pijbm[j * ncon + i] - ubfactors[i];
+            if cur > diffvec[i] {
+                diffvec[i] = cur;
+            }
+        }
+        if max < diffvec[i] {
+            max = diffvec[i];
+        }
+    }
+    max
+}
+
+/// BetterBalance2Way: returns true if y is better balanced than x.
+/// Both vectors are ubfactor-centered load imbalance vectors.
+pub(crate) fn better_balance_2way(n: usize, x: &[Real], y: &[Real]) -> bool {
+    let mut nrm1: Real = 0.0;
+    let mut nrm2: Real = 0.0;
+    for i in (0..n).rev() {
+        if x[i] > 0.0 {
+            nrm1 += x[i] * x[i];
+        }
+        if y[i] > 0.0 {
+            nrm2 += y[i] * y[i];
+        }
+    }
+    nrm2 < nrm1
+}
+
+/// SelectQueue: select the partition and constraint queue to move vertices from.
+/// Returns (from_partition, constraint_num). Returns (-1, -1) if nothing to move.
+pub(crate) fn select_queue(
+    part_weights: &[Idx],
+    ncon: usize,
+    pijbm: &[Real],
+    ubfactors: &[Real],
+    queues: &[PQueue],
+) -> (i32, i32) {
+    let mut from: i32 = -1;
+    let mut cnum: i32 = -1;
+    let mut max: Real = 0.0;
+
+    // First: find the most violated balancing constraint
+    for part in 0..2i32 {
+        for i in 0..ncon {
+            let idx = part as usize * ncon + i;
+            let tmp = part_weights[idx] as Real * pijbm[idx] - ubfactors[i];
+            // the '=' ensures that under tight constraints the partition at max is selected
+            if tmp >= max {
+                max = tmp;
+                from = part;
+                cnum = i as i32;
+            }
+        }
+    }
+
+    if from != -1 {
+        // If the desired queue is empty, select a queue from the same side
+        let qi = 2 * cnum as usize + from as usize;
+        if queues[qi].len() == 0 {
+            let mut found = false;
+            for i in 0..ncon {
+                if queues[2 * i + from as usize].len() > 0 {
+                    max = part_weights[from as usize * ncon + i] as Real * pijbm[from as usize * ncon + i] - ubfactors[i];
+                    cnum = i as i32;
+                    found = true;
+                    break;
+                }
+            }
+
+            if found {
+                let start = cnum as usize + 1;
+                for i in start..ncon {
+                    let tmp = part_weights[from as usize * ncon + i] as Real * pijbm[from as usize * ncon + i] - ubfactors[i];
+                    if tmp > max && queues[2 * i + from as usize].len() > 0 {
+                        max = tmp;
+                        cnum = i as i32;
+                    }
+                }
+            }
+        }
+    } else {
+        // Partition does not violate balancing constraints: select based on cut criteria
+        let mut fmax: f64 = f64::NEG_INFINITY;
+        for part in 0..2i32 {
+            for i in 0..ncon {
+                let qi = 2 * i + part as usize;
+                if queues[qi].len() > 0 {
+                    if let Some((_, key)) = queues[qi].peek_top() {
+                        if from == -1 || key > fmax {
+                            fmax = key;
+                            from = part;
+                            cnum = i as i32;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    (from, cnum)
+}
+
 /// Compute the load imbalance diff for a 2-way partition.
 ///
 /// Returns max over i in 0..nparts, j in 0..ncon of:
@@ -292,79 +443,158 @@ fn general_2way_balance(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_
     graph.edge_cut = edge_cut;
 }
 
-/// McGeneral2WayBalance: greedy multi-constraint 2-way balancing.
+/// McGeneral2WayBalance: multi-constraint 2-way balancing with 2*ncon queues.
 ///
-/// For ncon > 1: inserts all vertices from the overweight partition that could help
-/// reduce the imbalance, greedily moves them while the target side can absorb them.
-fn mc_general_2way_balance(_ctrl: &mut Control, graph: &mut GraphData, ntarget_part_weights: &[Real]) {
+/// Matches C METIS McGeneral2WayBalance from balance.c exactly:
+/// - Uses 2*ncon priority queues (one per constraint per partition)
+/// - qnum[i] = iargmax_nrm(...) for dominant constraint per vertex
+/// - Redistributes vertices from empty queues using iargmax2_nrm
+/// - SelectQueue picks which queue to drain
+/// - Greedy moves with rollback to best position
+/// - Stops when balance target is achieved (minbal <= 0)
+fn mc_general_2way_balance(ctrl: &mut Control, graph: &mut GraphData, _ntarget_part_weights: &[Real]) {
     let num_vertices = graph.num_vertices as usize;
     let ncon = graph.num_constraints as usize;
 
-    // Integer target weights per constraint per partition
-    let mut target_part_weights = vec![0 as Idx; 2 * ncon];
-    for j in 0..ncon {
-        target_part_weights[j] = (graph.total_vertex_weight[j] as Real * ntarget_part_weights[j]) as Idx;
-        target_part_weights[ncon + j] = graph.total_vertex_weight[j] - target_part_weights[j];
+    let limit = (0.01 * num_vertices as f64).max(15.0).min(100.0) as usize;
+
+    // Initialize 2*ncon queues
+    let mut queues: Vec<PQueue> = (0..2 * ncon).map(|_| PQueue::new(num_vertices)).collect();
+    let mut qsizes = vec![0usize; 2 * ncon];
+
+    // Compute qnum for each vertex
+    let mut qnum = vec![0usize; num_vertices];
+    for i in 0..num_vertices {
+        qnum[i] = iargmax_nrm(ncon, &graph.vertex_weights[i * ncon..(i + 1) * ncon], &graph.inv_total_vertex_weight);
+        qsizes[2 * qnum[i] + graph.partition[i] as usize] += 1;
     }
 
-    // Determine which partition is overweight (using first constraint that is out of balance)
-    let from: usize = if graph.part_weights[0] > target_part_weights[0] { 0 } else { 1 };
-    let to: usize = 1 - from;
-
-    // Build PQ from all vertices in the 'from' partition
-    let mut queue = PQueue::new(num_vertices);
-
-    for v in 0..num_vertices {
-        if graph.partition[v] as usize == from {
-            let gain = graph.external_degree[v] - graph.internal_degree[v];
-            queue.insert(v as Idx, gain as f64);
-        }
-    }
-
-    // Greedy move loop
-    while let Some((higain_idx, _key)) = queue.get_top() {
-        let best_vertex = higain_idx as usize;
-
-        // Check if moving this vertex would overload the 'to' partition in any constraint
-        let mut fits = true;
+    // Redistribute vertices from empty queues
+    for from in 0..2usize {
         for j in 0..ncon {
-            let new_to_wgt = graph.part_weights[to * ncon + j] + graph.vertex_weights[best_vertex * ncon + j];
-            if new_to_wgt > target_part_weights[to * ncon + j] {
-                fits = false;
-                break;
+            if qsizes[2 * j + from] == 0 {
+                for i in 0..num_vertices {
+                    if graph.partition[i] as usize != from {
+                        continue;
+                    }
+                    let k = iargmax2_nrm(ncon, &graph.vertex_weights[i * ncon..(i + 1) * ncon], &graph.inv_total_vertex_weight);
+                    if k == j
+                        && qsizes[2 * qnum[i] + from] > qsizes[2 * j + from]
+                        && graph.vertex_weights[i * ncon + qnum[i]] as Real * graph.inv_total_vertex_weight[qnum[i]]
+                            < 1.3 * graph.vertex_weights[i * ncon + j] as Real * graph.inv_total_vertex_weight[j]
+                    {
+                        qsizes[2 * qnum[i] + from] -= 1;
+                        qsizes[2 * j + from] += 1;
+                        qnum[i] = j;
+                    }
+                }
             }
         }
-        if !fits {
+    }
+
+    let mut minbalv = vec![0.0 as Real; ncon];
+    let mut minbal = compute_load_imbalance_diff_vec(
+        &graph.part_weights, ncon, 2, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols, &mut minbalv,
+    );
+
+    let mut newcut = graph.edge_cut;
+    let mut mincut = graph.edge_cut;
+    let mut mincutorder: i32 = -1;
+
+    let mut moved = vec![-1 as Idx; num_vertices];
+    let mut swaps = vec![0 as Idx; num_vertices];
+
+    // Insert ALL vertices into priority queues
+    let mut perm = vec![0 as Idx; num_vertices];
+    if num_vertices < 10 {
+        ctrl.rng.rand_array_permute(num_vertices, &mut perm, 0, true);
+    } else {
+        ctrl.rng.rand_array_permute_with_nshuffles(num_vertices, &mut perm, 0, num_vertices / 10, true);
+    }
+
+    for ii in 0..num_vertices {
+        let i = perm[ii] as usize;
+        let gain = graph.external_degree[i] - graph.internal_degree[i];
+        queues[2 * qnum[i] + graph.partition[i] as usize].insert(i as Idx, gain as f64);
+    }
+
+    let mut nswaps = 0usize;
+    let mut newbalv = vec![0.0 as Real; ncon];
+
+    loop {
+        if nswaps >= num_vertices {
+            break;
+        }
+        if minbal <= 0.0 {
             break;
         }
 
-        // Move vertex from 'from' to 'to'
-        graph.edge_cut -= graph.external_degree[best_vertex] - graph.internal_degree[best_vertex];
+        let (from, cnum) = select_queue(
+            &graph.part_weights, ncon, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols, &queues,
+        );
+        let to = if from >= 0 { (from + 1) % 2 } else { -1 };
 
-        graph.partition[best_vertex] = to as Idx;
+        if from == -1 {
+            break;
+        }
+        let higain = if let Some((v, _)) = queues[2 * cnum as usize + from as usize].get_top() {
+            v as usize
+        } else {
+            break;
+        };
+
+        newcut -= graph.external_degree[higain] - graph.internal_degree[higain];
+
+        // Update part_weights: iaxpy
         for j in 0..ncon {
-            graph.part_weights[to * ncon + j] += graph.vertex_weights[best_vertex * ncon + j];
-            graph.part_weights[from * ncon + j] -= graph.vertex_weights[best_vertex * ncon + j];
+            graph.part_weights[to as usize * ncon + j] += graph.vertex_weights[higain * ncon + j];
+            graph.part_weights[from as usize * ncon + j] -= graph.vertex_weights[higain * ncon + j];
         }
 
-        // Swap id and ed for the moved vertex
-        let tmp = graph.internal_degree[best_vertex];
-        graph.internal_degree[best_vertex] = graph.external_degree[best_vertex];
-        graph.external_degree[best_vertex] = tmp;
+        let newbal = compute_load_imbalance_diff_vec(
+            &graph.part_weights, ncon, 2, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols, &mut newbalv,
+        );
 
-        // Update boundary status of moved vertex
-        if graph.external_degree[best_vertex] == 0
-            && graph.xadj[best_vertex] < graph.xadj[best_vertex + 1]
+        if newbal < minbal
+            || (newbal == minbal
+                && (newcut < mincut
+                    || (newcut == mincut && better_balance_2way(ncon, &minbalv, &newbalv))))
         {
-            graph.remove_from_boundary(best_vertex);
-        } else if graph.boundary_map[best_vertex] == -1 {
-            graph.add_to_boundary(best_vertex);
+            mincut = newcut;
+            minbal = newbal;
+            mincutorder = nswaps as i32;
+            minbalv.copy_from_slice(&newbalv);
+        } else if nswaps as i32 - mincutorder > limit as i32 {
+            // Undo last move
+            newcut += graph.external_degree[higain] - graph.internal_degree[higain];
+            for j in 0..ncon {
+                graph.part_weights[from as usize * ncon + j] += graph.vertex_weights[higain * ncon + j];
+                graph.part_weights[to as usize * ncon + j] -= graph.vertex_weights[higain * ncon + j];
+            }
+            break;
+        }
+
+        graph.partition[higain] = to as Idx;
+        moved[higain] = nswaps as Idx;
+        swaps[nswaps] = higain as Idx;
+
+        // Swap id and ed
+        let tmp = graph.internal_degree[higain];
+        graph.internal_degree[higain] = graph.external_degree[higain];
+        graph.external_degree[higain] = tmp;
+
+        // Update boundary
+        if graph.external_degree[higain] == 0 && graph.boundary_map[higain] != -1 && graph.xadj[higain] < graph.xadj[higain + 1] {
+            graph.remove_from_boundary(higain);
+        }
+        if graph.external_degree[higain] > 0 && graph.boundary_map[higain] == -1 {
+            graph.add_to_boundary(higain);
         }
 
         // Update neighbors
-        for kk in graph.xadj[best_vertex] as usize..graph.xadj[best_vertex + 1] as usize {
+        for kk in graph.xadj[higain] as usize..graph.xadj[higain + 1] as usize {
             let k = graph.adjacency[kk] as usize;
-            let weight_delta = if to == graph.partition[k] as usize {
+            let weight_delta = if to == graph.partition[k] as i32 {
                 graph.edge_weights[kk]
             } else {
                 -graph.edge_weights[kk]
@@ -373,26 +603,69 @@ fn mc_general_2way_balance(_ctrl: &mut Control, graph: &mut GraphData, ntarget_p
             graph.internal_degree[k] += weight_delta;
             graph.external_degree[k] -= weight_delta;
 
-            // Update boundary and PQ for neighbor k
-            if graph.boundary_map[k] != -1 {
-                // k is on boundary
-                if graph.external_degree[k] == 0 && graph.xadj[k] < graph.xadj[k + 1] {
-                    graph.remove_from_boundary(k);
-                    if queue.contains(k as Idx) {
-                        queue.delete(k as Idx);
-                    }
-                } else if queue.contains(k as Idx) {
-                    queue.update(k as Idx, (graph.external_degree[k] - graph.internal_degree[k]) as f64);
-                }
-            } else {
-                // k is not on boundary
-                if graph.external_degree[k] > 0 {
-                    graph.add_to_boundary(k);
-                    if graph.partition[k] as usize == from {
-                        queue.insert(k as Idx, (graph.external_degree[k] - graph.internal_degree[k]) as f64);
-                    }
-                }
+            // Update queue position
+            if moved[k] == -1 {
+                queues[2 * qnum[k] + graph.partition[k] as usize].update(k as Idx, (graph.external_degree[k] - graph.internal_degree[k]) as f64);
+            }
+
+            // Update boundary
+            if graph.external_degree[k] == 0 && graph.boundary_map[k] != -1 {
+                graph.remove_from_boundary(k);
+            } else if graph.external_degree[k] > 0 && graph.boundary_map[k] == -1 {
+                graph.add_to_boundary(k);
             }
         }
+
+        nswaps += 1;
     }
+
+    // Rollback to best position
+    let rollback_start = mincutorder + 1;
+    if nswaps > 0 {
+        let mut i = nswaps as i32 - 1;
+        while i > mincutorder {
+            let higain = swaps[i as usize] as usize;
+            let to = (graph.partition[higain] + 1) % 2;
+            graph.partition[higain] = to;
+
+            let tmp = graph.internal_degree[higain];
+            graph.internal_degree[higain] = graph.external_degree[higain];
+            graph.external_degree[higain] = tmp;
+
+            if graph.external_degree[higain] == 0 && graph.boundary_map[higain] != -1 && graph.xadj[higain] < graph.xadj[higain + 1] {
+                graph.remove_from_boundary(higain);
+            } else if graph.external_degree[higain] > 0 && graph.boundary_map[higain] == -1 {
+                graph.add_to_boundary(higain);
+            }
+
+            for j in 0..ncon {
+                graph.part_weights[to as usize * ncon + j] += graph.vertex_weights[higain * ncon + j];
+                graph.part_weights[((to as usize + 1) % 2) * ncon + j] -= graph.vertex_weights[higain * ncon + j];
+            }
+
+            for kk in graph.xadj[higain] as usize..graph.xadj[higain + 1] as usize {
+                let k = graph.adjacency[kk] as usize;
+                let weight_delta = if to == graph.partition[k] {
+                    graph.edge_weights[kk]
+                } else {
+                    -graph.edge_weights[kk]
+                };
+
+                graph.internal_degree[k] += weight_delta;
+                graph.external_degree[k] -= weight_delta;
+
+                if graph.boundary_map[k] != -1 && graph.external_degree[k] == 0 {
+                    graph.remove_from_boundary(k);
+                }
+                if graph.boundary_map[k] == -1 && graph.external_degree[k] > 0 {
+                    graph.add_to_boundary(k);
+                }
+            }
+
+            i -= 1;
+        }
+    }
+
+    graph.edge_cut = mincut;
+    let _ = rollback_start; // suppress unused warning
 }

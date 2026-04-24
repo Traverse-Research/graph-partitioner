@@ -3,23 +3,58 @@ use crate::ctrl::Control;
 use crate::graph::GraphData;
 
 /// Initialize a 2-way partition on the coarsest graph. Tries niparts attempts.
+///
+/// Matches C METIS Init2WayPartition from initpart.c:
+/// - iptype==RANDOM && ncon==1: RandomBisection
+/// - iptype==RANDOM && ncon>1: McRandomBisection
+/// - iptype==GROW && ncon==1: GrowBisection (fallback to Random if no edges)
+/// - iptype==GROW && ncon>1: McGrowBisection (fallback to McRandom if no edges)
 pub fn init_2way_partition(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
     graph.alloc_2way();
+
+    let ncon = graph.num_constraints as usize;
+
+    match ctrl.init_part_type {
+        1 => {
+            // METIS_IPTYPE_RANDOM
+            if ncon == 1 {
+                random_bisection_loop(ctrl, graph, target_part_weights, niparts);
+            } else {
+                mc_random_bisection(ctrl, graph, target_part_weights, niparts);
+            }
+        }
+        _ => {
+            // METIS_IPTYPE_GROW (or default)
+            if graph.num_edges == 0 {
+                if ncon == 1 {
+                    random_bisection_loop(ctrl, graph, target_part_weights, niparts);
+                } else {
+                    mc_random_bisection(ctrl, graph, target_part_weights, niparts);
+                }
+            } else {
+                if ncon == 1 {
+                    grow_bisection_loop(ctrl, graph, target_part_weights, niparts);
+                } else {
+                    mc_grow_bisection(ctrl, graph, target_part_weights, niparts);
+                }
+            }
+        }
+    }
+}
+
+/// RandomBisection loop: for ncon==1, try niparts random bisections.
+fn random_bisection_loop(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
     let mut bestcut = Idx::MAX;
     let mut bestwhere = vec![0 as Idx; graph.num_vertices as usize];
 
-    for _inbfs in 0..niparts {
-        if ctrl.init_part_type == 1 {
-            random_bisection(ctrl, graph, target_part_weights);
-        } else {
-            grow_bisection(ctrl, graph, target_part_weights);
-        }
+    for inbfs in 0..niparts {
+        random_bisection(ctrl, graph, target_part_weights);
 
         compute_2way_partition_params(ctrl, graph);
         super::balance::balance_2way(ctrl, graph, target_part_weights);
-        super::fm::fm_2way_cut_refine(ctrl, graph, target_part_weights, ctrl.num_iter);
+        super::fm::fm_2way_refine(ctrl, graph, target_part_weights, 4);
 
-        if graph.edge_cut < bestcut {
+        if inbfs == 0 || bestcut > graph.edge_cut {
             bestcut = graph.edge_cut;
             bestwhere.copy_from_slice(&graph.partition);
             if bestcut == 0 {
@@ -28,8 +63,137 @@ pub fn init_2way_partition(ctrl: &mut Control, graph: &mut GraphData, target_par
         }
     }
 
+    graph.edge_cut = bestcut;
     graph.partition.copy_from_slice(&bestwhere);
-    compute_2way_partition_params(ctrl, graph);
+}
+
+/// GrowBisection loop: for ncon==1, try niparts grow bisections.
+fn grow_bisection_loop(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
+    let mut bestcut = Idx::MAX;
+    let mut bestwhere = vec![0 as Idx; graph.num_vertices as usize];
+
+    for inbfs in 0..niparts {
+        grow_bisection(ctrl, graph, target_part_weights);
+
+        compute_2way_partition_params(ctrl, graph);
+        super::balance::balance_2way(ctrl, graph, target_part_weights);
+        super::fm::fm_2way_refine(ctrl, graph, target_part_weights, ctrl.num_iter);
+
+        if inbfs == 0 || bestcut > graph.edge_cut {
+            bestcut = graph.edge_cut;
+            bestwhere.copy_from_slice(&graph.partition);
+            if bestcut == 0 {
+                break;
+            }
+        }
+    }
+
+    graph.edge_cut = bestcut;
+    graph.partition.copy_from_slice(&bestwhere);
+}
+
+/// McRandomBisection: multi-constraint random bisection.
+///
+/// Matches C METIS McRandomBisection from initpart.c:
+/// - Loops 2*niparts times
+/// - Each iteration: permute vertices, assign by round-robin on dominant constraint
+/// - Compute2WayPartitionParams
+/// - FM_2WayRefine → Balance2Way → FM → Balance → FM (3 FM + 2 Balance)
+/// - Best cut: bestcut >= graph->mincut (note >=, not >)
+fn mc_random_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
+    let num_vertices = graph.num_vertices as usize;
+    let ncon = graph.num_constraints as usize;
+
+    let mut bestcut = Idx::MAX;
+    let mut bestwhere = vec![0 as Idx; num_vertices];
+    let mut perm = vec![0 as Idx; num_vertices];
+    let mut counts = vec![0 as Idx; ncon];
+
+    for inbfs in 0..(2 * niparts) {
+        // Permute vertices
+        ctrl.rng.rand_array_permute_with_nshuffles(num_vertices, &mut perm, 0, num_vertices / 2, true);
+
+        // Reset counts
+        for c in counts.iter_mut() { *c = 0; }
+
+        // Assign vertices by round-robin on dominant constraint
+        for ii in 0..num_vertices {
+            let i = perm[ii] as usize;
+            // iargmax(ncon, vwgt+i*ncon, 1) - find constraint with maximum weight
+            let mut qnum = 0;
+            for j in 1..ncon {
+                if graph.vertex_weights[i * ncon + j] > graph.vertex_weights[i * ncon + qnum] {
+                    qnum = j;
+                }
+            }
+            graph.partition[i] = counts[qnum] % 2;
+            counts[qnum] += 1;
+        }
+
+        compute_2way_partition_params(ctrl, graph);
+        // FM → Balance → FM → Balance → FM
+        super::fm::fm_2way_refine(ctrl, graph, target_part_weights, ctrl.num_iter);
+        super::balance::balance_2way(ctrl, graph, target_part_weights);
+        super::fm::fm_2way_refine(ctrl, graph, target_part_weights, ctrl.num_iter);
+        super::balance::balance_2way(ctrl, graph, target_part_weights);
+        super::fm::fm_2way_refine(ctrl, graph, target_part_weights, ctrl.num_iter);
+
+        // Note: C METIS uses >= for mc, not > like single-constraint
+        if inbfs == 0 || bestcut >= graph.edge_cut {
+            bestcut = graph.edge_cut;
+            bestwhere.copy_from_slice(&graph.partition);
+            if bestcut == 0 {
+                break;
+            }
+        }
+    }
+
+    graph.edge_cut = bestcut;
+    graph.partition.copy_from_slice(&bestwhere);
+}
+
+/// McGrowBisection: multi-constraint grow bisection.
+///
+/// Matches C METIS McGrowBisection from initpart.c:
+/// - Loops 2*niparts times
+/// - Each iteration: set all to partition 1, randomly pick one vertex to partition 0
+/// - Compute2WayPartitionParams
+/// - Balance2Way → FM → Balance → FM (2 FM + 2 Balance)
+/// - Best cut: bestcut >= graph->mincut
+fn mc_grow_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
+    let num_vertices = graph.num_vertices as usize;
+
+    let mut bestcut = Idx::MAX;
+    let mut bestwhere = vec![0 as Idx; num_vertices];
+
+    for inbfs in 0..(2 * niparts) {
+        // Set all to partition 1
+        for i in 0..num_vertices {
+            graph.partition[i] = 1;
+        }
+        // Pick one random vertex for partition 0
+        let seed_v = ctrl.rng.rand_in_range(graph.num_vertices) as usize;
+        graph.partition[seed_v] = 0;
+
+        compute_2way_partition_params(ctrl, graph);
+
+        // Balance → FM → Balance → FM
+        super::balance::balance_2way(ctrl, graph, target_part_weights);
+        super::fm::fm_2way_refine(ctrl, graph, target_part_weights, ctrl.num_iter);
+        super::balance::balance_2way(ctrl, graph, target_part_weights);
+        super::fm::fm_2way_refine(ctrl, graph, target_part_weights, ctrl.num_iter);
+
+        if inbfs == 0 || bestcut >= graph.edge_cut {
+            bestcut = graph.edge_cut;
+            bestwhere.copy_from_slice(&graph.partition);
+            if bestcut == 0 {
+                break;
+            }
+        }
+    }
+
+    graph.edge_cut = bestcut;
+    graph.partition.copy_from_slice(&bestwhere);
 }
 
 /// GrowBisection: BFS from random seed, growing partition 0.
