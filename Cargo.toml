@@ -2,6 +2,19 @@
 name = "graph-partitioner"
 version = "0.1.0"
 edition = "2021"
+authors = ["Traverse-Research <opensource@traverseresearch.nl>"]
+description = "Graph and mesh partitioning library (METIS-compatible)"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/Traverse-Research/graph-partitioner"
+repository = "https://github.com/Traverse-Research/graph-partitioner"
+keywords = ["graph", "partitioning", "mesh", "metis"]
+categories = ["algorithms", "science"]
+include = ["/src", "/LICENSE-*", "/README.md"]
+documentation = "https://docs.rs/graph-partitioner"
+
+[package.metadata.docs.rs]
+all-features = true
 
 [dependencies]
 
