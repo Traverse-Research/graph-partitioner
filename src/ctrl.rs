@@ -102,7 +102,7 @@ impl Control {
             base_numbering,
             coarsen_to: 0,
             imbalance_tols,
-            target_part_weights: target_part_weights,
+            target_part_weights,
             max_vertex_weight: max_vertex_weights,
             partition_ij_balance_multipliers: Vec::new(),
             rng,
@@ -170,11 +170,11 @@ impl Control {
         let nparts = self.num_parts as usize;
         self.partition_ij_balance_multipliers = vec![0.0; nparts * ncon];
         for i in 0..nparts {
-            for j in 0..ncon {
+            for (j, &inv_weight) in inv_total_vertex_weight.iter().enumerate() {
                 let idx = i * ncon + j;
                 if self.target_part_weights[idx] > 0.0 {
                     self.partition_ij_balance_multipliers[idx] =
-                        inv_total_vertex_weight[j] / self.target_part_weights[idx];
+                        inv_weight / self.target_part_weights[idx];
                 } else {
                     self.partition_ij_balance_multipliers[idx] = 0.0;
                 }

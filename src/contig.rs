@@ -14,7 +14,7 @@ pub fn find_partition_induced_components(
     let mut components: Vec<Vec<Vec<usize>>> = vec![Vec::new(); np];
     let mut visited = vec![false; num_vertices];
 
-    for p in 0..np {
+    for (p, components_p) in components.iter_mut().enumerate() {
         for i in 0..num_vertices {
             if partition[i] as usize == p && !visited[i] {
                 // BFS to find component
@@ -33,7 +33,7 @@ pub fn find_partition_induced_components(
                     }
                 }
 
-                components[p].push(component);
+                components_p.push(component);
             }
         }
     }
@@ -46,22 +46,22 @@ pub fn find_partition_induced_components(
 pub fn eliminate_components(_ctrl: &mut Control, graph: &mut GraphData, nparts: Idx) {
     let (components,) = find_partition_induced_components(graph, &graph.partition.clone(), nparts);
 
-    for p in 0..nparts as usize {
-        if components[p].len() <= 1 {
+    for (p, components_p) in components.iter().enumerate() {
+        if components_p.len() <= 1 {
             continue;
         }
 
         // Keep the largest component, move others
         let mut largest_idx = 0;
         let mut largest_size = 0;
-        for (ci, comp) in components[p].iter().enumerate() {
+        for (ci, comp) in components_p.iter().enumerate() {
             if comp.len() > largest_size {
                 largest_size = comp.len();
                 largest_idx = ci;
             }
         }
 
-        for (ci, comp) in components[p].iter().enumerate() {
+        for (ci, comp) in components_p.iter().enumerate() {
             if ci == largest_idx {
                 continue;
             }

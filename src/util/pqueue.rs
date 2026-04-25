@@ -27,6 +27,7 @@ impl PQueue {
         self.heap.is_empty()
     }
 
+    #[allow(dead_code)]
     pub fn contains(&self, node: Idx) -> bool {
         let n = node as usize;
         n < self.locator.len() && self.locator[n] >= 0
@@ -858,7 +859,7 @@ mod tests {
         assert_eq!(best, 6);
 
         // Continue extracting - should always maintain heap property
-        while let Some(_) = pq.get_top() {
+        while pq.get_top().is_some() {
             // Just drain; heap invariant checked in get_top via delete
         }
     }

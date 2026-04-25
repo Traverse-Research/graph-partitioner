@@ -91,6 +91,7 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
 
         // Insert boundary vertices in PQ
         let num_boundary_usize = num_boundary as usize;
+        #[allow(clippy::needless_range_loop)]
         for i in 0..num_boundary_usize {
             perm[i] = i as Idx;
         }
@@ -110,8 +111,8 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
             }
         }
 
-        for ii in 0..num_boundary_usize {
-            let i = graph.boundary_list[perm[ii] as usize] as usize;
+        for &p in &perm[..num_boundary_usize] {
+            let i = graph.boundary_list[p as usize] as usize;
             if i >= num_vertices {
                 continue;
             }
@@ -126,12 +127,8 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
         }
 
         let mut nmoved = 0;
-        loop {
-            let i = if let Some((v, _)) = queue.get_top() {
-                v as usize
-            } else {
-                break;
-            };
+        while let Some((v, _)) = queue.get_top() {
+            let i = v as usize;
             vertex_status[i] = PQ_EXTRACTED;
 
             let from = graph.partition[i] as usize;
@@ -308,32 +305,28 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
                             update_index[ii] = num_updates as Idx;
                             num_updates += 1;
                         }
-                    } else {
-                        if vertex_status[ii] == PQ_PRESENT {
-                            if ckr_ii.external_degree > 0 {
-                                queue.update(ii as Idx, scaled_gain);
-                            } else {
-                                queue.delete(ii as Idx);
-                                vertex_status[ii] = PQ_NOT_PRESENT;
-                                if update_index[ii] >= 0 {
-                                    let pos = update_index[ii] as usize;
-                                    num_updates -= 1;
-                                    update_list[pos] = update_list[num_updates];
-                                    if (update_list[num_updates] as usize) < num_vertices {
-                                        update_index[update_list[num_updates] as usize] =
-                                            pos as Idx;
-                                    }
-                                    update_index[ii] = -1;
+                    } else if vertex_status[ii] == PQ_PRESENT {
+                        if ckr_ii.external_degree > 0 {
+                            queue.update(ii as Idx, scaled_gain);
+                        } else {
+                            queue.delete(ii as Idx);
+                            vertex_status[ii] = PQ_NOT_PRESENT;
+                            if update_index[ii] >= 0 {
+                                let pos = update_index[ii] as usize;
+                                num_updates -= 1;
+                                update_list[pos] = update_list[num_updates];
+                                if (update_list[num_updates] as usize) < num_vertices {
+                                    update_index[update_list[num_updates] as usize] = pos as Idx;
                                 }
+                                update_index[ii] = -1;
                             }
-                        } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree > 0
-                        {
-                            queue.insert(ii as Idx, scaled_gain);
-                            vertex_status[ii] = PQ_PRESENT;
-                            update_list[num_updates] = ii as Idx;
-                            update_index[ii] = num_updates as Idx;
-                            num_updates += 1;
                         }
+                    } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree > 0 {
+                        queue.insert(ii as Idx, scaled_gain);
+                        vertex_status[ii] = PQ_PRESENT;
+                        update_list[num_updates] = ii as Idx;
+                        update_index[ii] = num_updates as Idx;
+                        num_updates += 1;
                     }
                 }
             }
@@ -342,8 +335,8 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
         graph.num_boundary = num_boundary;
 
         // Reset vertex_status
-        for idx in 0..num_updates {
-            let v = update_list[idx] as usize;
+        for &u in &update_list[..num_updates] {
+            let v = u as usize;
             if v < num_vertices {
                 vertex_status[v] = PQ_NOT_PRESENT;
                 update_index[v] = -1;
@@ -356,6 +349,7 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn update_moved_vertex(
     graph: &mut GraphData,
     ctrl: &mut Control,
@@ -417,6 +411,7 @@ fn update_moved_vertex(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn update_adjacent_vertex(
     ctrl: &mut Control,
     graph: &mut GraphData,
@@ -449,12 +444,11 @@ fn update_adjacent_vertex(
                 graph.add_to_boundary(vid);
                 *num_boundary += 1;
             }
-        } else {
-            if graph.kway_refinement_info[vid].external_degree > 0 && graph.boundary_map[vid] == -1
-            {
-                graph.add_to_boundary(vid);
-                *num_boundary += 1;
-            }
+        } else if graph.kway_refinement_info[vid].external_degree > 0
+            && graph.boundary_map[vid] == -1
+        {
+            graph.add_to_boundary(vid);
+            *num_boundary += 1;
         }
     } else if me == to {
         graph.kway_refinement_info[vid].internal_degree += ewgt;
@@ -468,12 +462,11 @@ fn update_adjacent_vertex(
                 graph.remove_from_boundary(vid);
                 *num_boundary -= 1;
             }
-        } else {
-            if graph.kway_refinement_info[vid].external_degree <= 0 && graph.boundary_map[vid] != -1
-            {
-                graph.remove_from_boundary(vid);
-                *num_boundary -= 1;
-            }
+        } else if graph.kway_refinement_info[vid].external_degree <= 0
+            && graph.boundary_map[vid] != -1
+        {
+            graph.remove_from_boundary(vid);
+            *num_boundary -= 1;
         }
     }
 
@@ -569,6 +562,7 @@ fn ivecaxpygez(n: usize, a: Idx, x: &[Idx], y: &[Idx], z: &[Idx]) -> bool {
 
 /// BetterBalanceKWay: returns true if option 2 (a2,pt2,bm2) has better balance than option 1 (a1,pt1,bm1).
 /// Matches C METIS BetterBalanceKWay from mcutil.c.
+#[allow(clippy::too_many_arguments)]
 fn better_balance_kway(
     ncon: usize,
     vwgt: &[Idx],
@@ -671,6 +665,7 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
     if omode == MODE_BALANCE {
         ubfactors = ctrl.imbalance_tols[..ncon].to_vec();
     } else {
+        #[allow(clippy::needless_range_loop)]
         for i in 0..ncon {
             if ctrl.imbalance_tols[i] > ubfactors[i] {
                 ubfactors[i] = ctrl.imbalance_tols[i];
@@ -682,6 +677,7 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
     let mut minpwgts = vec![0 as Idx; nparts * ncon];
     let mut maxpwgts = vec![0 as Idx; nparts * ncon];
     for i in 0..nparts {
+        #[allow(clippy::needless_range_loop)]
         for j in 0..ncon {
             let idx = i * ncon + j;
             maxpwgts[idx] = (ctrl.target_part_weights[idx]
@@ -713,6 +709,7 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
 
         // Insert boundary vertices in PQ
         let num_boundary_usize = num_boundary as usize;
+        #[allow(clippy::needless_range_loop)]
         for i in 0..num_boundary_usize {
             perm[i] = i as Idx;
         }
@@ -732,8 +729,8 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
             }
         }
 
-        for ii in 0..num_boundary_usize {
-            let i = graph.boundary_list[perm[ii] as usize] as usize;
+        for &p in &perm[..num_boundary_usize] {
+            let i = graph.boundary_list[p as usize] as usize;
             if i >= num_vertices {
                 continue;
             }
@@ -749,12 +746,8 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
 
         let mut nmoved = 0;
         let mut iii: usize = 0; // vertex extraction counter (matches C for-loop iii)
-        loop {
-            let i = if let Some((v, _)) = queue.get_top() {
-                v as usize
-            } else {
-                break;
-            };
+        while let Some((v, _)) = queue.get_top() {
+            let i = v as usize;
             vertex_status[i] = PQ_EXTRACTED;
 
             let from = graph.partition[i] as usize;
@@ -785,17 +778,15 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                     iii += 1;
                     continue;
                 }
-            } else {
-                if !ivecaxpygez(
-                    ncon,
-                    -1,
-                    &vw,
-                    &graph.part_weights[from_start..from_start + ncon],
-                    &minpwgts[from_start..from_start + ncon],
-                ) {
-                    iii += 1;
-                    continue;
-                }
+            } else if !ivecaxpygez(
+                ncon,
+                -1,
+                &vw,
+                &graph.part_weights[from_start..from_start + ncon],
+                &minpwgts[from_start..from_start + ncon],
+            ) {
+                iii += 1;
+                continue;
             }
 
             let mut best_k: i32 = -1;
@@ -882,7 +873,7 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                                 1,
                                 &graph.part_weights[to_start..to_start + ncon],
                                 &pijbm[to_start..to_start + ncon],
-                            ) || (iii % 2 == 0)
+                            ) || iii.is_multiple_of(2)
                             // safetos always 2 when no minconn
                         )))
                 {
@@ -980,6 +971,7 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
             nmoved += 1;
 
             // Update part weights (multi-constraint: ncon values)
+            #[allow(clippy::needless_range_loop)]
             for j in 0..ncon {
                 graph.part_weights[to_start + j] += vw[j];
                 graph.part_weights[from_start + j] -= vw[j];
@@ -1043,32 +1035,28 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                             update_index[ii] = num_updates as Idx;
                             num_updates += 1;
                         }
-                    } else {
-                        if vertex_status[ii] == PQ_PRESENT {
-                            if ckr_ii.external_degree > 0 {
-                                queue.update(ii as Idx, scaled_gain);
-                            } else {
-                                queue.delete(ii as Idx);
-                                vertex_status[ii] = PQ_NOT_PRESENT;
-                                if update_index[ii] >= 0 {
-                                    let pos = update_index[ii] as usize;
-                                    num_updates -= 1;
-                                    update_list[pos] = update_list[num_updates];
-                                    if (update_list[num_updates] as usize) < num_vertices {
-                                        update_index[update_list[num_updates] as usize] =
-                                            pos as Idx;
-                                    }
-                                    update_index[ii] = -1;
+                    } else if vertex_status[ii] == PQ_PRESENT {
+                        if ckr_ii.external_degree > 0 {
+                            queue.update(ii as Idx, scaled_gain);
+                        } else {
+                            queue.delete(ii as Idx);
+                            vertex_status[ii] = PQ_NOT_PRESENT;
+                            if update_index[ii] >= 0 {
+                                let pos = update_index[ii] as usize;
+                                num_updates -= 1;
+                                update_list[pos] = update_list[num_updates];
+                                if (update_list[num_updates] as usize) < num_vertices {
+                                    update_index[update_list[num_updates] as usize] = pos as Idx;
                                 }
+                                update_index[ii] = -1;
                             }
-                        } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree > 0
-                        {
-                            queue.insert(ii as Idx, scaled_gain);
-                            vertex_status[ii] = PQ_PRESENT;
-                            update_list[num_updates] = ii as Idx;
-                            update_index[ii] = num_updates as Idx;
-                            num_updates += 1;
                         }
+                    } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree > 0 {
+                        queue.insert(ii as Idx, scaled_gain);
+                        vertex_status[ii] = PQ_PRESENT;
+                        update_list[num_updates] = ii as Idx;
+                        update_index[ii] = num_updates as Idx;
+                        num_updates += 1;
                     }
                 }
             }
@@ -1079,8 +1067,8 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
         graph.num_boundary = num_boundary;
 
         // Reset vertex_status
-        for idx in 0..num_updates {
-            let v = update_list[idx] as usize;
+        for &u in &update_list[..num_updates] {
+            let v = u as usize;
             if v < num_vertices {
                 vertex_status[v] = PQ_NOT_PRESENT;
                 update_index[v] = -1;

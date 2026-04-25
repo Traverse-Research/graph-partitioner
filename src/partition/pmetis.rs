@@ -241,7 +241,7 @@ pub fn mlevel_recursive_bisection(
 ///    c. Init2WayPartition(ctrl, cgraph, target_part_weights, niparts)
 ///    d. Refine2Way(ctrl, graph, cgraph, target_part_weights) - uncoarsens and refines
 ///    e. Keep best based on balance/cut
-/// Matches C METIS MultilevelBisect from pmetis.c:
+///    Matches C METIS MultilevelBisect from pmetis.c:
 /// - Uses ComputeLoadImbalanceDiff for balance comparison
 /// - Selection: i==0 || (curbal<=0.0005 && bestobj>curobj) || (bestbal>0.0005 && curbal<bestbal)
 /// - Early break on bestobj==0
@@ -337,7 +337,7 @@ fn compute_load_imbalance_diff_2way(
     imbalance_tols: &[Real],
 ) -> Real {
     let ncon = graph.num_constraints as usize;
-    let mut max_diff: Real = -1.0 * ncon as Real;
+    let mut max_diff: Real = -(ncon as Real);
     for i in 0..2 {
         for j in 0..ncon {
             let idx = i * ncon + j;

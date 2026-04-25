@@ -13,7 +13,7 @@ const BOUNDARY_BALANCE: Idx = 2;
 /// (where initial partitioning was performed).
 ///
 /// Walks from coarsest to finest: compute params, balance if needed, refine, project.
-pub fn refine_kway(ctrl: &mut Control, graph: &mut GraphData, levels: &mut Vec<GraphData>) {
+pub fn refine_kway(ctrl: &mut Control, graph: &mut GraphData, levels: &mut [GraphData]) {
     let niter = ctrl.num_iter;
     let nparts = ctrl.num_parts;
     let nlevels = levels.len(); // number of coarser levels
@@ -196,6 +196,7 @@ fn project_kway_partition(ctrl: &mut Control, finer: &mut GraphData, coarser: &G
     if finer.partition.len() != num_vertices {
         finer.partition = vec![0; num_vertices];
     }
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_vertices {
         let k = finer.coarse_map[i] as usize;
         finer.partition[i] = coarser.partition[k];
@@ -210,6 +211,7 @@ fn project_kway_partition(ctrl: &mut Control, finer: &mut GraphData, coarser: &G
 
     let mut num_boundary: Idx = 0;
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_vertices {
         let istart = finer.xadj[i] as usize;
         let iend = finer.xadj[i + 1] as usize;

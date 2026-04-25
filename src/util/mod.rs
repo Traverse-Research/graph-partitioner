@@ -8,6 +8,7 @@ use crate::types::{Idx, Real};
 pub fn iargmax(n: usize, arr: &[Idx]) -> usize {
     let mut max_idx = 0;
     let mut max_val = arr[0];
+    #[allow(clippy::needless_range_loop)]
     for i in 1..n {
         if arr[i] > max_val {
             max_val = arr[i];
@@ -22,6 +23,7 @@ pub fn iargmax(n: usize, arr: &[Idx]) -> usize {
 pub fn rargmax(n: usize, arr: &[Real]) -> usize {
     let mut max_idx = 0;
     let mut max_val = arr[0];
+    #[allow(clippy::needless_range_loop)]
     for i in 1..n {
         if arr[i] > max_val {
             max_val = arr[i];
@@ -90,19 +92,20 @@ pub fn bucket_sort_keys_inc(n: usize, max: Idx, keys: &[Idx], tperm: &mut [Idx])
     let max_usize = max as usize + 1;
     let mut counts = vec![0usize; max_usize];
 
-    for i in 0..n {
-        counts[keys[i] as usize] += 1;
+    for &key in &keys[..n] {
+        counts[key as usize] += 1;
     }
 
     // Prefix sum
     let mut sum = 0;
-    for i in 0..max_usize {
-        let c = counts[i];
-        counts[i] = sum;
+    for count in &mut counts {
+        let c = *count;
+        *count = sum;
         sum += c;
     }
 
     // Place elements
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n {
         let k = keys[i] as usize;
         tperm[counts[k]] = i as Idx;
@@ -115,6 +118,7 @@ pub fn bucket_sort_keys_inc(n: usize, max: Idx, keys: &[Idx], tperm: &mut [Idx])
 pub fn compute_partition_weights(graph: &GraphData, partition: &[Idx], nparts: Idx) -> Vec<Idx> {
     let ncon = graph.num_constraints as usize;
     let mut part_weights = vec![0 as Idx; nparts as usize * ncon];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..graph.num_vertices as usize {
         let p = partition[i] as usize;
         for j in 0..ncon {

@@ -15,7 +15,7 @@ use crate::types::{Idx, Real};
 pub fn refine_2way(
     ctrl: &mut Control,
     graph: &mut GraphData,
-    levels: &mut Vec<GraphData>,
+    levels: &mut [GraphData],
     target_part_weights: &[Real],
 ) {
     let niter = ctrl.num_iter;

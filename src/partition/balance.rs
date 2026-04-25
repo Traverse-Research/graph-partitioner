@@ -95,6 +95,7 @@ pub(crate) fn select_queue(
 
     // First: find the most violated balancing constraint
     for part in 0..2i32 {
+        #[allow(clippy::needless_range_loop)]
         for i in 0..ncon {
             let idx = part as usize * ncon + i;
             let tmp = part_weights[idx] as Real * pijbm[idx] - ubfactors[i];
@@ -110,10 +111,10 @@ pub(crate) fn select_queue(
     if from != -1 {
         // If the desired queue is empty, select a queue from the same side
         let qi = 2 * cnum as usize + from as usize;
-        if queues[qi].len() == 0 {
+        if queues[qi].is_empty() {
             let mut found = false;
             for i in 0..ncon {
-                if queues[2 * i + from as usize].len() > 0 {
+                if !queues[2 * i + from as usize].is_empty() {
                     max = part_weights[from as usize * ncon + i] as Real
                         * pijbm[from as usize * ncon + i]
                         - ubfactors[i];
@@ -129,7 +130,7 @@ pub(crate) fn select_queue(
                     let tmp = part_weights[from as usize * ncon + i] as Real
                         * pijbm[from as usize * ncon + i]
                         - ubfactors[i];
-                    if tmp > max && queues[2 * i + from as usize].len() > 0 {
+                    if tmp > max && !queues[2 * i + from as usize].is_empty() {
                         max = tmp;
                         cnum = i as i32;
                     }
@@ -142,7 +143,7 @@ pub(crate) fn select_queue(
         for part in 0..2i32 {
             for i in 0..ncon {
                 let qi = 2 * i + part as usize;
-                if queues[qi].len() > 0 {
+                if !queues[qi].is_empty() {
                     if let Some((_, key)) = queues[qi].peek_top() {
                         if from == -1 || key > fmax {
                             fmax = key;
@@ -277,8 +278,8 @@ fn bnd_2way_balance(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_weig
     }
 
     // Insert boundary vertices of 'from' partition with vertex_weights <= mindiff
-    for ii in 0..num_boundary {
-        let i = perm[ii] as usize;
+    for &p in &perm[..num_boundary] {
+        let i = p as usize;
         let v = graph.boundary_list[i] as usize;
         if graph.partition[v] as usize == from && graph.vertex_weights[v] <= mindiff {
             queue.insert(
@@ -292,12 +293,8 @@ fn bnd_2way_balance(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_weig
     let mut nswaps: Idx = 0;
 
     // Greedy move loop
-    loop {
-        let best_vertex = if let Some((v, _)) = queue.get_top() {
-            v as usize
-        } else {
-            break;
-        };
+    while let Some((v, _)) = queue.get_top() {
+        let best_vertex = v as usize;
 
         // If moving this vertex would overload the 'to' partition, stop
         if graph.part_weights[to] + graph.vertex_weights[best_vertex] > target_part_weights[to] {
@@ -312,9 +309,10 @@ fn bnd_2way_balance(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_weig
         moved[best_vertex] = nswaps;
 
         // Swap id and ed for the moved vertex
-        let tmp = graph.internal_degree[best_vertex];
-        graph.internal_degree[best_vertex] = graph.external_degree[best_vertex];
-        graph.external_degree[best_vertex] = tmp;
+        std::mem::swap(
+            &mut graph.internal_degree[best_vertex],
+            &mut graph.external_degree[best_vertex],
+        );
 
         if graph.external_degree[best_vertex] == 0
             && graph.xadj[best_vertex] < graph.xadj[best_vertex + 1]
@@ -344,16 +342,14 @@ fn bnd_2way_balance(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_weig
                     {
                         queue.delete(k as Idx);
                     }
-                } else {
-                    if moved[k] == -1
-                        && graph.partition[k] as usize == from
-                        && graph.vertex_weights[k] <= mindiff
-                    {
-                        queue.update(
-                            k as Idx,
-                            (graph.external_degree[k] - graph.internal_degree[k]) as f64,
-                        );
-                    }
+                } else if moved[k] == -1
+                    && graph.partition[k] as usize == from
+                    && graph.vertex_weights[k] <= mindiff
+                {
+                    queue.update(
+                        k as Idx,
+                        (graph.external_degree[k] - graph.internal_degree[k]) as f64,
+                    );
                 }
             } else {
                 // k is not on boundary
@@ -423,8 +419,8 @@ fn general_2way_balance(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_
     }
 
     // Insert ALL vertices from 'from' partition with small weight
-    for ii in 0..num_vertices {
-        let i = perm[ii] as usize;
+    for &p in &perm[..num_vertices] {
+        let i = p as usize;
         if graph.partition[i] as usize == from && graph.vertex_weights[i] <= mindiff {
             queue.insert(
                 i as Idx,
@@ -437,12 +433,8 @@ fn general_2way_balance(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_
     let mut nswaps: Idx = 0;
 
     // Greedy move loop
-    loop {
-        let best_vertex = if let Some((v, _)) = queue.get_top() {
-            v as usize
-        } else {
-            break;
-        };
+    while let Some((v, _)) = queue.get_top() {
+        let best_vertex = v as usize;
 
         // If moving this vertex would overload the 'to' partition, stop
         if graph.part_weights[to] + graph.vertex_weights[best_vertex] > target_part_weights[to] {
@@ -457,9 +449,10 @@ fn general_2way_balance(ctrl: &mut Control, graph: &mut GraphData, ntarget_part_
         moved[best_vertex] = nswaps;
 
         // Swap id and ed for the moved vertex
-        let tmp = graph.internal_degree[best_vertex];
-        graph.internal_degree[best_vertex] = graph.external_degree[best_vertex];
-        graph.external_degree[best_vertex] = tmp;
+        std::mem::swap(
+            &mut graph.internal_degree[best_vertex],
+            &mut graph.external_degree[best_vertex],
+        );
 
         // Update boundary status of moved vertex (two separate checks, matching C METIS)
         if graph.external_degree[best_vertex] == 0
@@ -526,7 +519,7 @@ fn mc_general_2way_balance(
     let num_vertices = graph.num_vertices as usize;
     let ncon = graph.num_constraints as usize;
 
-    let limit = (0.01 * num_vertices as f64).max(15.0).min(100.0) as usize;
+    let limit = (0.01 * num_vertices as f64).clamp(15.0, 100.0) as usize;
 
     // Initialize 2*ncon queues
     let mut queues: Vec<PQueue> = (0..2 * ncon).map(|_| PQueue::new(num_vertices)).collect();
@@ -534,6 +527,7 @@ fn mc_general_2way_balance(
 
     // Compute qnum for each vertex
     let mut qnum = vec![0usize; num_vertices];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_vertices {
         qnum[i] = iargmax_nrm(
             ncon,
@@ -605,8 +599,8 @@ fn mc_general_2way_balance(
         );
     }
 
-    for ii in 0..num_vertices {
-        let i = perm[ii] as usize;
+    for &p in &perm[..num_vertices] {
+        let i = p as usize;
         let gain = graph.external_degree[i] - graph.internal_degree[i];
         queues[2 * qnum[i] + graph.partition[i] as usize].insert(i as Idx, gain as f64);
     }
@@ -668,7 +662,6 @@ fn mc_general_2way_balance(
             minbalv.copy_from_slice(&newbalv);
         } else if nswaps as i32 - mincutorder > limit as i32 {
             // Undo last move
-            newcut += graph.external_degree[higain] - graph.internal_degree[higain];
             for j in 0..ncon {
                 graph.part_weights[from as usize * ncon + j] +=
                     graph.vertex_weights[higain * ncon + j];
@@ -683,9 +676,10 @@ fn mc_general_2way_balance(
         swaps[nswaps] = higain as Idx;
 
         // Swap id and ed
-        let tmp = graph.internal_degree[higain];
-        graph.internal_degree[higain] = graph.external_degree[higain];
-        graph.external_degree[higain] = tmp;
+        std::mem::swap(
+            &mut graph.internal_degree[higain],
+            &mut graph.external_degree[higain],
+        );
 
         // Update boundary
         if graph.external_degree[higain] == 0
@@ -701,7 +695,7 @@ fn mc_general_2way_balance(
         // Update neighbors
         for kk in graph.xadj[higain] as usize..graph.xadj[higain + 1] as usize {
             let k = graph.adjacency[kk] as usize;
-            let weight_delta = if to == graph.partition[k] as i32 {
+            let weight_delta = if to == graph.partition[k] {
                 graph.edge_weights[kk]
             } else {
                 -graph.edge_weights[kk]
@@ -738,9 +732,10 @@ fn mc_general_2way_balance(
             let to = (graph.partition[higain] + 1) % 2;
             graph.partition[higain] = to;
 
-            let tmp = graph.internal_degree[higain];
-            graph.internal_degree[higain] = graph.external_degree[higain];
-            graph.external_degree[higain] = tmp;
+            std::mem::swap(
+                &mut graph.internal_degree[higain],
+                &mut graph.external_degree[higain],
+            );
 
             if graph.external_degree[higain] == 0
                 && graph.boundary_map[higain] != -1
