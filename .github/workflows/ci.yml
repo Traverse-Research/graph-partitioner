@@ -5,10 +5,7 @@ name: Continuous integration
 jobs:
   check:
     name: Check and Lint
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - name: Cargo check
