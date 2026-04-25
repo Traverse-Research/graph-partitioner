@@ -530,3 +530,16 @@ fn compare_quad_mesh_dual() {
         compare_part_dual(&element_offsets, &element_indices, nn, 2, seed);
     }
 }
+
+#[test]
+fn compare_recursive_meshlet_grid_dual_450t_4p() {
+    // Regression: this fixture is the dual graph of a 16×16 quad-grid mesh
+    // (`ncommon=2`) captured from `breda-mesh`'s meshlet builder. Partitioning
+    // it into 4 parts with `Graph::part_recursive` exposes a divergence between
+    // graph-partitioner and C metis that propagates as a one-triangle drift in
+    // the downstream Nanite golden snapshot.
+    let (xadj, adjacency) = meshlet_grid_dual_450t_4p();
+    for &seed in &[42, 0, 12345] {
+        compare_part_recursive(&xadj, &adjacency, 4, seed);
+    }
+}
