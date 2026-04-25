@@ -1,11 +1,11 @@
-use crate::types::{Idx, Real};
 use crate::ctrl::Control;
-use crate::option::Options;
-use crate::graph::GraphData;
 use crate::graph::coarsen::coarsen_graph;
+use crate::graph::GraphData;
+use crate::option::Options;
 use crate::partition::initpart;
 use crate::partition::refine2way;
 use crate::partition::split;
+use crate::types::{Idx, Real};
 
 /// SMALL_NUM_INIT_PARTS / LARGE_NUM_INIT_PARTS from C METIS
 const SMALL_NUM_INIT_PARTS: Idx = 5;
@@ -33,7 +33,11 @@ pub fn init_kway_partition(ctrl: &mut Control, graph: &mut GraphData, nparts: Id
     // Create a temporary PMETIS ctrl, replicating SetupCtrl for METIS_OP_PMETIS.
     // In C METIS, InitKWayPartitioning calls METIS_PartGraphRecursive on the
     // coarsest graph, which creates a fresh ctrl with PMETIS settings.
-    let ncuts = if ctrl.num_init_parts > 0 { ctrl.num_init_parts } else { 1 };
+    let ncuts = if ctrl.num_init_parts > 0 {
+        ctrl.num_init_parts
+    } else {
+        1
+    };
 
     // Seed: C METIS does NOT propagate the seed to the inner PMETIS ctrl.
     // seed remains None (default -1), so InitRandom(-1) uses default seed 4321.
@@ -51,7 +55,7 @@ pub fn init_kway_partition(ctrl: &mut Control, graph: &mut GraphData, nparts: Id
     //   ncon >  1: iptype=RANDOM(1), ufactor=10, CoarsenTo=100
     if ncon > 1 {
         pctrl.init_part_type = 1; // METIS_IPTYPE_RANDOM
-        // ufactor=10 (MCPMETIS_DEFAULT_UFACTOR) - but imbalance_tols are overridden below
+                                  // ufactor=10 (MCPMETIS_DEFAULT_UFACTOR) - but imbalance_tols are overridden below
     }
     pctrl.coarsen_to = if ncon == 1 { 20 } else { 100 };
 
@@ -73,7 +77,8 @@ pub fn init_kway_partition(ctrl: &mut Control, graph: &mut GraphData, nparts: Id
     }
 
     // Compute target_part_weights: uniform 1/nparts for each partition and constraint
-    pctrl.target_part_weights = vec![1.0 / nparts as Real; (nparts * graph.num_constraints) as usize];
+    pctrl.target_part_weights =
+        vec![1.0 / nparts as Real; (nparts * graph.num_constraints) as usize];
 
     // In C METIS, METIS_PartGraphRecursive calls SetupCtrl which resets the
     // global RNG to the original seed. pctrl already has the correct seed from
@@ -86,7 +91,14 @@ pub fn init_kway_partition(ctrl: &mut Control, graph: &mut GraphData, nparts: Id
     // Run recursive bisection: MlevelRecursiveBisection
     let mut part = vec![0 as Idx; num_vertices];
     let target_part_weights = pctrl.target_part_weights.clone();
-    mlevel_recursive_bisection(&mut pctrl, graph, nparts, &mut part, &target_part_weights, 0);
+    mlevel_recursive_bisection(
+        &mut pctrl,
+        graph,
+        nparts,
+        &mut part,
+        &target_part_weights,
+        0,
+    );
 
     // In C METIS, the global RNG state after recursive bisection persists.
     // Propagate pctrl's RNG state back to the parent ctrl so RefineKWay
@@ -129,8 +141,8 @@ pub fn mlevel_recursive_bisection(
     }
 
     // Step 1: Compute target_part_weights2 for the bisection.
-    // target_part_weights2[0*ncon+j] = sum of target_part_weights[i*ncon+j] for i in 0..nparts/2
-    // target_part_weights2[1*ncon+j] = sum of target_part_weights[i*ncon+j] for i in nparts/2..nparts
+    // C METIS: tpwgts2[i] = rsum(nparts/2, tpwgts+i, ncon)
+    //          tpwgts2[ncon+i] = 1.0 - tpwgts2[i]
     let nparts_left = nparts / 2;
     let nparts_right = nparts - nparts_left;
 
@@ -139,9 +151,8 @@ pub fn mlevel_recursive_bisection(
         for i in 0..nparts_left as usize {
             target_part_weights2[j] += target_part_weights[i * ncon + j];
         }
-        for i in nparts_left as usize..nparts as usize {
-            target_part_weights2[ncon + j] += target_part_weights[i * ncon + j];
-        }
+        // Match C: tpwgts2[ncon+i] = 1.0 - tpwgts2[i] (double intermediate)
+        target_part_weights2[ncon + j] = (1.0_f64 - target_part_weights2[j] as f64) as Real;
     }
 
     // Step 2: MultilevelBisect
@@ -161,17 +172,36 @@ pub fn mlevel_recursive_bisection(
         let (mut lgraph, mut rgraph) = split::split_graph_part(graph);
 
         // Step 5: Scale target_part_weights for recursive calls.
-        // Left subgraph gets target_part_weights[0..nparts_left], normalized by sum(target_part_weights2[0..ncon])
-        // Right subgraph gets target_part_weights[nparts_left..nparts], normalized by sum(target_part_weights2[ncon..2*ncon])
-        let mut left_target_part_weights = vec![0.0 as Real; (nparts_left * graph.num_constraints) as usize];
-        let mut right_target_part_weights = vec![0.0 as Real; (nparts_right * graph.num_constraints) as usize];
+        // C METIS scales tpwgts IN PLACE:
+        //   wsum = rsum(nparts/2, tpwgts+i, ncon)
+        //   rscale(nparts/2, 1.0/wsum, tpwgts+i, ncon)
+        //   rscale(nparts-nparts/2, 1.0/(1.0-wsum), tpwgts+(nparts/2)*ncon+i, ncon)
+        // We create separate arrays but use the same f64 intermediate computation.
+        let mut left_target_part_weights =
+            vec![0.0 as Real; (nparts_left * graph.num_constraints) as usize];
+        let mut right_target_part_weights =
+            vec![0.0 as Real; (nparts_right * graph.num_constraints) as usize];
 
         for j in 0..ncon {
-            let wgt_left = if target_part_weights2[j] > 0.0 { 1.0 / target_part_weights2[j] } else { 0.0 };
-            let wgt_right = if target_part_weights2[ncon + j] > 0.0 { 1.0 / target_part_weights2[ncon + j] } else { 0.0 };
+            // C recomputes wsum = rsum(left half), same as target_part_weights2[j]
+            let wsum = target_part_weights2[j];
+            // C: 1.0/wsum — double division, result truncated to float for rscale
+            let wgt_left = if wsum > 0.0 {
+                (1.0_f64 / wsum as f64) as Real
+            } else {
+                0.0
+            };
+            // C: 1.0/(1.0-wsum) — double chain, result truncated to float for rscale
+            let one_minus_wsum = 1.0_f64 - wsum as f64;
+            let wgt_right = if one_minus_wsum > 0.0 {
+                (1.0_f64 / one_minus_wsum) as Real
+            } else {
+                0.0
+            };
 
             for i in 0..nparts_left as usize {
-                left_target_part_weights[i * ncon + j] = target_part_weights[i * ncon + j] * wgt_left;
+                left_target_part_weights[i * ncon + j] =
+                    target_part_weights[i * ncon + j] * wgt_left;
             }
             for i in 0..nparts_right as usize {
                 right_target_part_weights[i * ncon + j] =
@@ -246,14 +276,23 @@ fn multilevel_bisect(ctrl: &mut Control, graph: &mut GraphData, target_part_weig
         };
 
         // Step 2c: Init2WayPartition on the coarsest graph
-        initpart::init_2way_partition(ctrl, levels.last_mut().unwrap(), target_part_weights, niparts);
+        initpart::init_2way_partition(
+            ctrl,
+            levels.last_mut().unwrap(),
+            target_part_weights,
+            niparts,
+        );
 
         // Step 2d: Refine2Way - uncoarsen and refine through the chain.
         refine2way::refine_2way(ctrl, &mut work, &mut levels, target_part_weights);
 
         // After refinement, work (orggraph) has the final partition result.
         let curobj = work.edge_cut;
-        let curbal = compute_load_imbalance_diff_2way(&work, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols);
+        let curbal = compute_load_imbalance_diff_2way(
+            &work,
+            &ctrl.partition_ij_balance_multipliers,
+            &ctrl.imbalance_tols,
+        );
 
         // Step 2e: Keep best (matching C METIS criterion exactly)
         // C METIS only saves bestwhere on non-last iterations (i < ncuts-1).
@@ -292,14 +331,22 @@ fn multilevel_bisect(ctrl: &mut Control, graph: &mut GraphData, target_part_weig
 /// Returns max over all partitions and constraints of:
 ///   part_weights[i*ncon+j] * partition_ij_balance_multipliers[i*ncon+j] - imbalance_tols[j]
 /// Negative means balanced, positive means imbalanced.
-fn compute_load_imbalance_diff_2way(graph: &GraphData, partition_ij_balance_multipliers: &[Real], imbalance_tols: &[Real]) -> Real {
+fn compute_load_imbalance_diff_2way(
+    graph: &GraphData,
+    partition_ij_balance_multipliers: &[Real],
+    imbalance_tols: &[Real],
+) -> Real {
     let ncon = graph.num_constraints as usize;
     let mut max_diff: Real = -1.0 * ncon as Real;
     for i in 0..2 {
         for j in 0..ncon {
             let idx = i * ncon + j;
-            if idx < graph.part_weights.len() && idx < partition_ij_balance_multipliers.len() && j < imbalance_tols.len() {
-                let diff = graph.part_weights[idx] as Real * partition_ij_balance_multipliers[idx] - imbalance_tols[j];
+            if idx < graph.part_weights.len()
+                && idx < partition_ij_balance_multipliers.len()
+                && j < imbalance_tols.len()
+            {
+                let diff = graph.part_weights[idx] as Real * partition_ij_balance_multipliers[idx]
+                    - imbalance_tols[j];
                 if diff > max_diff {
                     max_diff = diff;
                 }
@@ -325,4 +372,3 @@ fn clone_graph_for_bisect(g: &GraphData) -> GraphData {
     ng.label = (0..g.num_vertices).collect();
     ng
 }
-
