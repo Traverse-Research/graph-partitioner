@@ -12,12 +12,12 @@ pub fn split_graph_part(graph: &GraphData) -> (GraphData, GraphData) {
     let mut lcount = 0;
     let mut rcount = 0;
 
-    for i in 0..num_vertices {
+    for (i, map_i) in map.iter_mut().enumerate() {
         if graph.partition[i] == 0 {
-            map[i] = lcount;
+            *map_i = lcount;
             lcount += 1;
         } else {
-            map[i] = rcount;
+            *map_i = rcount;
             rcount += 1;
         }
     }

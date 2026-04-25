@@ -42,7 +42,7 @@ impl<'a> Graph<'a> {
         if num_parts < 1 {
             return Err(NewGraphError::NoParts);
         }
-        if xadj.len() < 1 {
+        if xadj.is_empty() {
             return Err(NewGraphError::msg("xadj must have at least one element"));
         }
 
@@ -261,7 +261,7 @@ impl<'a> Mesh<'a> {
         if num_parts < 1 {
             return Err(NewMeshError::NoParts);
         }
-        if element_offsets.len() < 1 {
+        if element_offsets.is_empty() {
             return Err(NewMeshError::msg(
                 "element_offsets must have at least one element",
             ));

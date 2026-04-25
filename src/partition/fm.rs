@@ -27,7 +27,7 @@ pub fn fm_2way_cut_refine(
             - (graph.total_vertex_weight[0] as Real * target_part_weights[0]) as Idx,
     ];
 
-    let limit = (0.01 * num_vertices as f64).max(15.0).min(100.0) as usize;
+    let limit = (0.01 * num_vertices as f64).clamp(15.0, 100.0) as usize;
     let avgvertex_weights = ((graph.part_weights[0] + graph.part_weights[1]) / 20)
         .min(2 * (graph.part_weights[0] + graph.part_weights[1]) / num_vertices.max(1) as Idx);
     let origdiff = (itarget_part_weights[0] - graph.part_weights[0]).abs();
@@ -63,8 +63,8 @@ pub fn fm_2way_cut_refine(
             );
         }
 
-        for ii in 0..num_boundary {
-            let v = graph.boundary_list[perm[ii] as usize] as usize;
+        for &p in &perm[..num_boundary] {
+            let v = graph.boundary_list[p as usize] as usize;
             let gain = graph.external_degree[v] - graph.internal_degree[v];
             queues[graph.partition[v] as usize].insert(v as Idx, gain as f64);
         }
@@ -116,9 +116,10 @@ pub fn fm_2way_cut_refine(
             swaps[nswaps] = best_vertex as Idx;
 
             // Swap id and ed for the moved vertex
-            let tmp = graph.internal_degree[best_vertex];
-            graph.internal_degree[best_vertex] = graph.external_degree[best_vertex];
-            graph.external_degree[best_vertex] = tmp;
+            std::mem::swap(
+                &mut graph.internal_degree[best_vertex],
+                &mut graph.external_degree[best_vertex],
+            );
 
             // Update boundary of moved vertex
             if graph.external_degree[best_vertex] == 0
@@ -190,9 +191,10 @@ pub fn fm_2way_cut_refine(
             graph.partition[best_vertex] = from as Idx;
 
             // Swap id/ed back
-            let tmp = graph.internal_degree[best_vertex];
-            graph.internal_degree[best_vertex] = graph.external_degree[best_vertex];
-            graph.external_degree[best_vertex] = tmp;
+            std::mem::swap(
+                &mut graph.internal_degree[best_vertex],
+                &mut graph.external_degree[best_vertex],
+            );
 
             graph.part_weights[from] += graph.vertex_weights[best_vertex];
             graph.part_weights[to] -= graph.vertex_weights[best_vertex];
@@ -261,8 +263,8 @@ pub fn fm_2way_refine(
 /// - ffactor = 0.5 / max(20, nvtxs) for balance fudge factor
 /// - ubfactors relaxed to current imbalance via ComputeLoadImbalanceDiffVec
 /// - Best criteria: (newcut < mincut && newbal <= ffactor) ||
-///                  (newcut == mincut && (newbal < minbal ||
-///                   (newbal == minbal && BetterBalance2Way)))
+///   (newcut == mincut && (newbal < minbal ||
+///   (newbal == minbal && BetterBalance2Way)))
 /// - Rollback to best position
 #[allow(unused_assignments)]
 pub fn fm_mc_2way_cut_refine(
@@ -278,7 +280,7 @@ pub fn fm_mc_2way_cut_refine(
         return;
     }
 
-    let limit = (0.01 * num_vertices as f64).max(25.0).min(150.0) as usize;
+    let limit = (0.01 * num_vertices as f64).clamp(25.0, 150.0) as usize;
     let ffactor: Real = 0.5 / (20.0f64.max(num_vertices as f64)) as Real;
 
     // Initialize 2*ncon queues
@@ -286,6 +288,7 @@ pub fn fm_mc_2way_cut_refine(
 
     // Compute qnum for each vertex
     let mut qnum = vec![0usize; num_vertices];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_vertices {
         qnum[i] = iargmax_nrm(
             ncon,
@@ -304,6 +307,7 @@ pub fn fm_mc_2way_cut_refine(
         &ctrl.imbalance_tols,
         &mut ubfactors,
     );
+    #[allow(clippy::needless_range_loop)]
     for i in 0..ncon {
         ubfactors[i] = if ubfactors[i] > 0.0 {
             ctrl.imbalance_tols[i] + ubfactors[i]
@@ -351,8 +355,8 @@ pub fn fm_mc_2way_cut_refine(
             );
         }
 
-        for ii in 0..num_boundary {
-            let i = graph.boundary_list[perm[ii] as usize] as usize;
+        for &p in &perm[..num_boundary] {
+            let i = graph.boundary_list[p as usize] as usize;
             let rgain = graph.external_degree[i] - graph.internal_degree[i];
             queues[2 * qnum[i] + graph.partition[i] as usize].insert(i as Idx, rgain as f64);
         }
@@ -428,9 +432,10 @@ pub fn fm_mc_2way_cut_refine(
             swaps[nswaps] = higain as Idx;
 
             // Swap id and ed
-            let tmp = graph.internal_degree[higain];
-            graph.internal_degree[higain] = graph.external_degree[higain];
-            graph.external_degree[higain] = tmp;
+            std::mem::swap(
+                &mut graph.internal_degree[higain],
+                &mut graph.external_degree[higain],
+            );
 
             if graph.external_degree[higain] == 0 && graph.xadj[higain] < graph.xadj[higain + 1] {
                 graph.remove_from_boundary(higain);
@@ -439,7 +444,7 @@ pub fn fm_mc_2way_cut_refine(
             // Update neighbors
             for kk in graph.xadj[higain] as usize..graph.xadj[higain + 1] as usize {
                 let k = graph.adjacency[kk] as usize;
-                let weight_delta = if to == graph.partition[k] as i32 {
+                let weight_delta = if to == graph.partition[k] {
                     graph.edge_weights[kk]
                 } else {
                     -graph.edge_weights[kk]
@@ -459,14 +464,12 @@ pub fn fm_mc_2way_cut_refine(
                         queues[2 * qnum[k] + graph.partition[k] as usize]
                             .update(k as Idx, rgain as f64);
                     }
-                } else {
-                    if graph.external_degree[k] > 0 {
-                        graph.add_to_boundary(k);
-                        if moved[k] == -1 {
-                            let rgain = graph.external_degree[k] - graph.internal_degree[k];
-                            queues[2 * qnum[k] + graph.partition[k] as usize]
-                                .insert(k as Idx, rgain as f64);
-                        }
+                } else if graph.external_degree[k] > 0 {
+                    graph.add_to_boundary(k);
+                    if moved[k] == -1 {
+                        let rgain = graph.external_degree[k] - graph.internal_degree[k];
+                        queues[2 * qnum[k] + graph.partition[k] as usize]
+                            .insert(k as Idx, rgain as f64);
                     }
                 }
             }
@@ -486,9 +489,10 @@ pub fn fm_mc_2way_cut_refine(
                 let to = (graph.partition[higain] + 1) % 2;
                 graph.partition[higain] = to;
 
-                let tmp = graph.internal_degree[higain];
-                graph.internal_degree[higain] = graph.external_degree[higain];
-                graph.external_degree[higain] = tmp;
+                std::mem::swap(
+                    &mut graph.internal_degree[higain],
+                    &mut graph.external_degree[higain],
+                );
 
                 if graph.external_degree[higain] == 0
                     && graph.boundary_map[higain] != -1

@@ -107,8 +107,10 @@ pub fn build_node_element_csr(
     let mut nind = vec![0 as Idx; nptr[nn_usize] as usize];
     let mut nptr_copy = nptr.clone();
     for i in 0..ne_usize {
-        for k in element_offsets[i] as usize..element_offsets[i + 1] as usize {
-            let node = element_indices[k] as usize;
+        for &elem_idx in
+            &element_indices[element_offsets[i] as usize..element_offsets[i + 1] as usize]
+        {
+            let node = elem_idx as usize;
             nind[nptr_copy[node] as usize] = i as Idx;
             nptr_copy[node] += 1;
         }

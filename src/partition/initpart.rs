@@ -36,12 +36,10 @@ pub fn init_2way_partition(
                 } else {
                     mc_random_bisection(ctrl, graph, target_part_weights, niparts);
                 }
+            } else if ncon == 1 {
+                grow_bisection_loop(ctrl, graph, target_part_weights, niparts);
             } else {
-                if ncon == 1 {
-                    grow_bisection_loop(ctrl, graph, target_part_weights, niparts);
-                } else {
-                    mc_grow_bisection(ctrl, graph, target_part_weights, niparts);
-                }
+                mc_grow_bisection(ctrl, graph, target_part_weights, niparts);
             }
         }
     }
@@ -145,8 +143,8 @@ fn mc_random_bisection(
         }
 
         // Assign vertices by round-robin on dominant constraint
-        for ii in 0..num_vertices {
-            let i = perm[ii] as usize;
+        for &p in &perm[..num_vertices] {
+            let i = p as usize;
             // iargmax(ncon, vwgt+i*ncon, 1) - find constraint with maximum weight
             let mut qnum = 0;
             for j in 1..ncon {
@@ -269,6 +267,7 @@ fn grow_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights
             // Find random untouched vertex
             let k = ctrl.rng.rand_in_range(nleft as Idx) as usize;
             let mut cnt = 0;
+            #[allow(clippy::needless_range_loop)]
             for i in 0..num_vertices {
                 if touched[i] == 0 {
                     if cnt == k {

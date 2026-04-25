@@ -89,9 +89,7 @@ fn induce_row_part_from_column_part(
     let mut neighbor_mark = vec![-1 as Idx; nparts];
 
     // Initialize rpart to -1 (unassigned)
-    for i in 0..nrows {
-        rpart[i] = -1;
-    }
+    rpart[..nrows].fill(-1);
 
     // Setup integer target partition weights
     let itarget_part_weights: Vec<Idx> = if let Some(tp) = target_part_weights {
@@ -159,13 +157,13 @@ fn induce_row_part_from_column_part(
         // If overweight, reassign to the lightest partition among neighbors
         let pi = rpart[i] as usize;
         if part_weights[pi] > itarget_part_weights[pi] {
-            for j in 0..nnbrs {
-                let nd = neighbor_partitions[j] as usize;
+            for &np in &neighbor_partitions[..nnbrs] {
+                let nd = np as usize;
                 if part_weights[nd] < itarget_part_weights[nd]
                     || (part_weights[nd] - itarget_part_weights[nd])
                         < (part_weights[pi] - itarget_part_weights[pi])
                 {
-                    rpart[i] = neighbor_partitions[j];
+                    rpart[i] = np;
                     break;
                 }
             }

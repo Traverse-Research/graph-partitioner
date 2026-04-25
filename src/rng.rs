@@ -15,6 +15,7 @@ impl Rng {
         Rng { state: s, count: 0 }
     }
 
+    #[expect(dead_code)]
     pub fn call_count(&self) -> u64 {
         self.count
     }

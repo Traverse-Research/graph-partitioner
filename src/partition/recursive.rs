@@ -29,10 +29,8 @@ pub fn part_recursive(graph: Graph, part: &mut [Idx]) -> Result<Idx> {
     // Handle ncon > 1 overrides matching C METIS SetupCtrl for METIS_OP_PMETIS:
     // - iptype forced to RANDOM(1) for multi-constraint
     // - CoarsenTo = 100 instead of 20
-    if ncon > 1 {
-        if graph.options.init_part_type.is_none() {
-            ctrl.init_part_type = 1; // METIS_IPTYPE_RANDOM
-        }
+    if ncon > 1 && graph.options.init_part_type.is_none() {
+        ctrl.init_part_type = 1; // METIS_IPTYPE_RANDOM
     }
     ctrl.coarsen_to = if ncon == 1 { 20 } else { 100 };
 

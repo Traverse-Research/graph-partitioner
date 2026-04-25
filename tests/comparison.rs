@@ -21,6 +21,7 @@ fn compare_part_kway(xadj: &[i32], adjacency: &[i32], nparts: i32, seed: i32) {
         .unwrap();
 
     // First check: valid partitions
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n {
         assert!(
             r_part[i] >= 0 && r_part[i] < nparts,
@@ -76,8 +77,8 @@ fn compare_part_kway_weighted(
         .part_kway(&mut r_part)
         .unwrap();
 
-    for i in 0..n {
-        assert!(r_part[i] >= 0 && r_part[i] < nparts);
+    for &p in &r_part[..n] {
+        assert!(p >= 0 && p < nparts);
     }
 
     assert_eq!(
@@ -119,11 +120,11 @@ fn compare_part_dual(
         .unwrap();
 
     // Valid partitions
-    for i in 0..ne {
-        assert!(r_epart[i] >= 0 && r_epart[i] < nparts);
+    for &p in &r_epart[..ne] {
+        assert!(p >= 0 && p < nparts);
     }
-    for i in 0..nn as usize {
-        assert!(r_npart[i] >= 0 && r_npart[i] < nparts);
+    for &p in &r_npart[..nn as usize] {
+        assert!(p >= 0 && p < nparts);
     }
 
     assert_eq!(
@@ -171,6 +172,7 @@ fn compare_part_kway_mc(
         .unwrap();
 
     // Valid partitions
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n {
         assert!(
             r_part[i] >= 0 && r_part[i] < nparts,
@@ -236,7 +238,8 @@ fn compare_mc_grid_10x10_ncon2_2parts() {
         vwgt[i * 2] = 1;
         vwgt[i * 2 + 1] = (i + 1) as i32;
     }
-    for &seed in &[42] {
+    {
+        let &seed = &42;
         compare_part_kway_mc(&xadj, &adjacency, 2, &vwgt, 2, seed);
     }
 }
@@ -250,7 +253,8 @@ fn compare_mc_grid_10x10_ncon2_4parts() {
         vwgt[i * 2] = 1;
         vwgt[i * 2 + 1] = (i + 1) as i32;
     }
-    for &seed in &[42] {
+    {
+        let &seed = &42;
         compare_part_kway_mc(&xadj, &adjacency, 2, &vwgt, 4, seed);
     }
 }
@@ -289,6 +293,7 @@ fn compare_part_recursive(xadj: &[i32], adjacency: &[i32], nparts: i32, seed: i3
         .part_recursive(&mut r_part)
         .unwrap();
 
+    #[allow(clippy::needless_range_loop)]
     for i in 0..n {
         assert!(
             r_part[i] >= 0 && r_part[i] < nparts,
@@ -381,7 +386,8 @@ fn compare_recursive_grid_10x10_4parts() {
 #[test]
 fn compare_recursive_grid_10x10_8parts() {
     let (xadj, adjacency) = grid_10x10();
-    for &seed in &[42] {
+    {
+        let &seed = &42;
         compare_part_recursive(&xadj, &adjacency, 8, seed);
     }
 }
@@ -399,8 +405,8 @@ fn test_trivial_2v_valid() {
         .part_kway(&mut part)
         .unwrap();
     // Should have 2 different partitions
-    assert!(part.iter().any(|&p| p == 0));
-    assert!(part.iter().any(|&p| p == 1));
+    assert!(part.contains(&0));
+    assert!(part.contains(&1));
     assert!(cut >= 0);
 }
 
@@ -415,7 +421,7 @@ fn test_path_5v_valid() {
         .part_kway(&mut part)
         .unwrap();
     for &p in &part {
-        assert!(p >= 0 && p < 2);
+        assert!((0..2).contains(&p));
     }
     assert!(cut > 0);
 }
@@ -566,7 +572,8 @@ fn compare_grid_10x10_4parts() {
 #[test]
 fn compare_grid_10x10_8parts() {
     let (xadj, adjacency) = grid_10x10();
-    for &seed in &[42] {
+    {
+        let &seed = &42;
         compare_part_kway(&xadj, &adjacency, 8, seed);
     }
 }

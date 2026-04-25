@@ -30,7 +30,7 @@ pub fn create_coarse_graph(
     let mut cedge_weights = vec![0 as Idx; max_edges];
 
     // Hash table for edge merging
-    let mut htable = vec![-1 as i32; mask + 1];
+    let mut htable = vec![-1_i32; mask + 1];
 
     let mut cnum_edges: usize = 0;
 

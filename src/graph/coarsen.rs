@@ -113,6 +113,7 @@ fn matchingshem(ctrl: &mut Control, graph: &mut GraphData) {
     let avgdegree = avgdegree.max(1);
 
     let mut degrees = vec![0 as Idx; num_vertices];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_vertices {
         let deg = graph.xadj[i + 1] - graph.xadj[i];
         let bnum = ((1.0 + deg as f64).sqrt()) as Idx;
@@ -226,6 +227,7 @@ fn matchingshem(ctrl: &mut Control, graph: &mut GraphData) {
 
     // Final renumbering: assign sequential coarse vertex IDs
     let mut new_cnum_vertices: Idx = 0;
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_vertices {
         if matching[i] == UNMATCHED {
             matching[i] = i as Idx;
@@ -263,6 +265,7 @@ fn matchingrm(ctrl: &mut Control, graph: &mut GraphData) {
     let avgdegree = avgdegree.max(1);
 
     let mut degrees = vec![0 as Idx; num_vertices];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_vertices {
         let deg = graph.xadj[i + 1] - graph.xadj[i];
         degrees[i] = ((1.0 + deg as f64).sqrt() as Idx).min(avgdegree);
@@ -363,6 +366,7 @@ fn matchingrm(ctrl: &mut Control, graph: &mut GraphData) {
     }
 
     let mut new_cnum_vertices: Idx = 0;
+    #[allow(clippy::needless_range_loop)]
     for i in 0..num_vertices {
         if matching[i] == UNMATCHED {
             matching[i] = i as Idx;
@@ -439,8 +443,8 @@ fn matching2hop_any(
     let mut colptr = vec![0 as Idx; num_vertices + 1];
 
     // Count phase
-    for pi in 0..num_vertices {
-        let i = perm[pi] as usize;
+    for &p in &perm[..num_vertices] {
+        let i = p as usize;
         if matching[i] != UNMATCHED {
             continue;
         }
@@ -466,8 +470,8 @@ fn matching2hop_any(
     let mut colptr_copy = colptr.clone();
 
     // Fill phase
-    for pi in 0..num_vertices {
-        let i = perm[pi] as usize;
+    for &p in &perm[..num_vertices] {
+        let i = p as usize;
         if matching[i] != UNMATCHED {
             continue;
         }
@@ -541,8 +545,8 @@ fn matching2hop_all(
         1
     };
 
-    for pi in 0..num_vertices {
-        let i = perm[pi] as usize;
+    for &p in &perm[..num_vertices] {
+        let i = p as usize;
         if matching[i] != UNMATCHED {
             continue;
         }
@@ -650,10 +654,10 @@ fn bucket_sort_perm(n: usize, max_key: Idx, keys: &[Idx], input: &[Idx], output:
     }
 
     let mut sum = 0;
-    for i in 0..nbuckets {
-        let c = counts[i];
-        counts[i] = sum;
-        sum += c;
+    for c in &mut counts {
+        let prev = *c;
+        *c = sum;
+        sum += prev;
     }
 
     for i in 0..n {
