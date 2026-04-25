@@ -1,25 +1,29 @@
-pub mod kway;
-pub mod recursive;
-pub mod pmetis;
-pub mod initpart;
-pub mod fm;
 pub mod balance;
+pub mod fm;
+pub mod initpart;
+pub mod kway;
+pub mod kwayfm;
+pub mod kwayrefine;
+pub mod pmetis;
+pub mod recursive;
 pub mod refine2way;
 pub mod split;
-pub mod kwayrefine;
-pub mod kwayfm;
 
-use crate::types::{Idx, Real};
 use crate::ctrl::Control;
-use crate::graph::GraphData;
 use crate::graph::coarsen::coarsen_graph;
+use crate::graph::GraphData;
+use crate::types::{Idx, Real};
 
 /// MlevelKWayPartitioning: multilevel k-way partitioning orchestration.
 ///
 /// Matches C METIS MlevelKWayPartitioning from kmetis.c:
 /// - For ncuts iterations: coarsen -> alloc kway memory -> init partition -> refine -> keep best
 /// - Best-cut selection uses ComputeLoadImbalanceDiff with curbal <= 0.0005 criterion
-pub fn mlevel_kway_partitioning(ctrl: &mut Control, graph: &mut GraphData, part: &mut [Idx]) -> Idx {
+pub fn mlevel_kway_partitioning(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    part: &mut [Idx],
+) -> Idx {
     let nparts = ctrl.num_parts;
     let ncuts = ctrl.num_cuts;
     let num_vertices = graph.num_vertices as usize;
@@ -56,7 +60,12 @@ pub fn mlevel_kway_partitioning(ctrl: &mut Control, graph: &mut GraphData, part:
 
         // Evaluate the result on the finest graph
         let curobj = graph.edge_cut;
-        let curbal = compute_load_imbalance_diff(graph, nparts as usize, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols);
+        let curbal = compute_load_imbalance_diff(
+            graph,
+            nparts as usize,
+            &ctrl.partition_ij_balance_multipliers,
+            &ctrl.imbalance_tols,
+        );
         if i == 0
             || (curbal <= 0.0005 && bestobj > curobj)
             || (bestbal > 0.0005 && curbal < bestbal)
@@ -91,8 +100,12 @@ fn compute_load_imbalance_diff(
     for i in 0..nparts {
         for j in 0..ncon {
             let idx = i * ncon + j;
-            if idx < graph.part_weights.len() && idx < partition_ij_balance_multipliers.len() && j < imbalance_tols.len() {
-                let diff = graph.part_weights[idx] as Real * partition_ij_balance_multipliers[idx] - imbalance_tols[j];
+            if idx < graph.part_weights.len()
+                && idx < partition_ij_balance_multipliers.len()
+                && j < imbalance_tols.len()
+            {
+                let diff = graph.part_weights[idx] as Real * partition_ij_balance_multipliers[idx]
+                    - imbalance_tols[j];
                 if diff > max_diff {
                     max_diff = diff;
                 }

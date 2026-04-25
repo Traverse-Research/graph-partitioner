@@ -1,7 +1,7 @@
-use crate::types::{Idx, Real};
-use crate::rng::Rng;
-use crate::option::Options;
 use crate::graph::NeighborPartInfo;
+use crate::option::Options;
+use crate::rng::Rng;
+use crate::types::{Idx, Real};
 
 /// Internal control structure holding parsed options and runtime state.
 #[expect(dead_code)]
@@ -51,7 +51,9 @@ impl Control {
         let objtype = options.obj_type.map_or(0, |v| v.value());
         let ctype = options.coarsen_type.map_or(1, |v| v.value());
         let iptype = options.init_part_type.map_or(0, |v| v.value());
-        let rtype = options.refine_type.map_or(if is_kway { 1 } else { 0 }, |v| v.value());
+        let rtype = options
+            .refine_type
+            .map_or(if is_kway { 1 } else { 0 }, |v| v.value());
         let ncuts = options.num_cuts.unwrap_or(1);
         let nseps = options.num_separators.unwrap_or(1);
         let niter = options.num_iter.unwrap_or(10);
@@ -135,19 +137,25 @@ impl Control {
         self.neighbor_pool_pos += clamped;
         // Grow pool if needed
         if self.neighbor_pool_pos > self.neighbor_pool.len() {
-            self.neighbor_pool.resize(self.neighbor_pool_pos * 2, NeighborPartInfo::default());
+            self.neighbor_pool
+                .resize(self.neighbor_pool_pos * 2, NeighborPartInfo::default());
         }
         pos as i32
     }
 
     /// Setup 2-way balance multipliers.
-    pub fn setup_2way_balance_multipliers(&mut self, inv_total_vertex_weight: &[Real], target_part_weights2: &[Real]) {
+    pub fn setup_2way_balance_multipliers(
+        &mut self,
+        inv_total_vertex_weight: &[Real],
+        target_part_weights2: &[Real],
+    ) {
         let ncon = self.num_constraints as usize;
         self.partition_ij_balance_multipliers = vec![0.0; 2 * ncon];
         for i in 0..2 {
             for j in 0..ncon {
                 if target_part_weights2[i * ncon + j] > 0.0 {
-                    self.partition_ij_balance_multipliers[i * ncon + j] = inv_total_vertex_weight[j] / target_part_weights2[i * ncon + j];
+                    self.partition_ij_balance_multipliers[i * ncon + j] =
+                        inv_total_vertex_weight[j] / target_part_weights2[i * ncon + j];
                 } else {
                     self.partition_ij_balance_multipliers[i * ncon + j] = 0.0;
                 }
@@ -165,7 +173,8 @@ impl Control {
             for j in 0..ncon {
                 let idx = i * ncon + j;
                 if self.target_part_weights[idx] > 0.0 {
-                    self.partition_ij_balance_multipliers[idx] = inv_total_vertex_weight[j] / self.target_part_weights[idx];
+                    self.partition_ij_balance_multipliers[idx] =
+                        inv_total_vertex_weight[j] / self.target_part_weights[idx];
                 } else {
                     self.partition_ij_balance_multipliers[idx] = 0.0;
                 }

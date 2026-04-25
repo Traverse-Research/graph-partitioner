@@ -1,12 +1,16 @@
-use crate::types::Idx;
 use crate::ctrl::Control;
-use crate::graph::GraphData;
 use crate::graph::setup::setup_graph_total_vertex_weight;
+use crate::graph::GraphData;
+use crate::types::Idx;
 
 const HTLENGTH: usize = (1 << 13) - 1; // 8191
 
 /// Build a coarsened graph from the matching stored in graph.coarse_map and graph.matching.
-pub fn create_coarse_graph(_ctrl: &mut Control, graph: &GraphData, cnum_vertices: Idx) -> GraphData {
+pub fn create_coarse_graph(
+    _ctrl: &mut Control,
+    graph: &GraphData,
+    cnum_vertices: Idx,
+) -> GraphData {
     let num_vertices = graph.num_vertices as usize;
     let ncon = graph.num_constraints as usize;
     let cnum_vertices_usize = cnum_vertices as usize;

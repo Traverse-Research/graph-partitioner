@@ -38,7 +38,13 @@ pub fn is_balanced(
     total_vertex_weight: &[Idx],
     imbalance_tols: &[Real],
 ) -> bool {
-    let lb = compute_load_imbalance(ncon, nparts, part_weights, target_part_weights, total_vertex_weight);
+    let lb = compute_load_imbalance(
+        ncon,
+        nparts,
+        part_weights,
+        target_part_weights,
+        total_vertex_weight,
+    );
     for j in 0..ncon {
         if lb[j] > imbalance_tols[j] {
             return false;

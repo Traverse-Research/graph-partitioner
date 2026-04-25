@@ -57,7 +57,11 @@ fn compare_mesh_partition(
 /// Asserts bit-identical results between C metis and graph_partitioner.
 fn compare_partition_mesh_remapped(indices: &[u32], num_parts: i32, seed: i32) {
     let num_tris = indices.len() / 3;
-    assert_eq!(indices.len() % 3, 0, "indices length must be a multiple of 3");
+    assert_eq!(
+        indices.len() % 3,
+        0,
+        "indices length must be a multiple of 3"
+    );
 
     // Remap to compact [0, N) — mirrors the production code exactly
     let max_v = indices.iter().copied().max().unwrap_or(0) as usize;
@@ -117,13 +121,7 @@ fn compare_partition_mesh_remapped(indices: &[u32], num_parts: i32, seed: i32) {
 /// Mirrors the production group_component calling pattern exactly.
 /// Weighted CSR graph, part_kway with ObjType::Cut + edge weights on BOTH
 /// C metis and graph_partitioner, asserts bit-identical results.
-fn compare_weighted_kway(
-    xadj: &[i32],
-    adjncy: &[i32],
-    adjwgt: &[i32],
-    nparts: i32,
-    seed: i32,
-) {
+fn compare_weighted_kway(xadj: &[i32], adjncy: &[i32], adjwgt: &[i32], nparts: i32, seed: i32) {
     let n = xadj.len() - 1;
     let mut c_part = vec![0i32; n];
     let mut r_part = vec![0i32; n];
@@ -349,12 +347,7 @@ fn weighted_single_edge() {
 // ========= Diagnostic: unweighted graph kway tests =========
 
 /// Compare unweighted graph kway partition (no edge weights, no vertex weights).
-fn compare_unweighted_kway(
-    xadj: &[i32],
-    adjncy: &[i32],
-    nparts: i32,
-    seed: i32,
-) {
+fn compare_unweighted_kway(xadj: &[i32], adjncy: &[i32], nparts: i32, seed: i32) {
     let n = xadj.len() - 1;
     let mut c_part = vec![0i32; n];
     let mut r_part = vec![0i32; n];
@@ -484,11 +477,24 @@ fn compare_dual_ncommon2_kway_contiguous(
     let c_adjncy = c_dual.adjncy();
 
     // Build dual graph with ncommon=2 using Rust
-    let (r_xadj, r_adjncy) = graph_partitioner::create_graph_dual(ne, nn, element_offsets, element_indices, 2);
+    let (r_xadj, r_adjncy) =
+        graph_partitioner::create_graph_dual(ne, nn, element_offsets, element_indices, 2);
 
     // Verify dual graphs match
-    assert_eq!(c_xadj, &r_xadj[..], "Dual graph xadj differs (ncommon=2, ne={}, seed={})", ne, seed);
-    assert_eq!(c_adjncy, &r_adjncy[..], "Dual graph adjncy differs (ncommon=2, ne={}, seed={})", ne, seed);
+    assert_eq!(
+        c_xadj,
+        &r_xadj[..],
+        "Dual graph xadj differs (ncommon=2, ne={}, seed={})",
+        ne,
+        seed
+    );
+    assert_eq!(
+        c_adjncy,
+        &r_adjncy[..],
+        "Dual graph adjncy differs (ncommon=2, ne={}, seed={})",
+        ne,
+        seed
+    );
 
     let n = c_xadj.len() - 1;
     let mut c_part = vec![0i32; n];
@@ -540,7 +546,8 @@ fn compare_dual_ncommon2_recursive(
     let c_adjncy = c_dual.adjncy();
 
     // Build dual graph with ncommon=2 using Rust
-    let (r_xadj, r_adjncy) = graph_partitioner::create_graph_dual(ne, nn, element_offsets, element_indices, 2);
+    let (r_xadj, r_adjncy) =
+        graph_partitioner::create_graph_dual(ne, nn, element_offsets, element_indices, 2);
 
     let n = c_xadj.len() - 1;
     let mut c_part = vec![0i32; n];
@@ -644,11 +651,22 @@ fn production_recursive_dual_ncommon2_sphere_4parts() {
 #[test]
 fn diagnostic_dual_sweep() {
     let configs = [
-        (3, 3, 2), (3, 3, 4), (4, 4, 2), (4, 4, 4),
-        (5, 5, 2), (5, 5, 4), (5, 5, 8),
-        (6, 6, 2), (6, 6, 4), (6, 6, 8),
-        (7, 7, 2), (7, 7, 4), (7, 7, 8),
-        (8, 8, 2), (8, 8, 4), (8, 8, 8),
+        (3, 3, 2),
+        (3, 3, 4),
+        (4, 4, 2),
+        (4, 4, 4),
+        (5, 5, 2),
+        (5, 5, 4),
+        (5, 5, 8),
+        (6, 6, 2),
+        (6, 6, 4),
+        (6, 6, 8),
+        (7, 7, 2),
+        (7, 7, 4),
+        (7, 7, 8),
+        (8, 8, 2),
+        (8, 8, 4),
+        (8, 8, 8),
     ];
     for &(rows, cols, nparts) in &configs {
         let (eoff, eind) = tri_grid_mesh(rows, cols);
@@ -675,14 +693,15 @@ fn diagnostic_dual_sweep() {
             .unwrap();
 
         let ne_count = ne;
-        let max_deg = (0..n).map(|i| xadj[i+1] - xadj[i]).max().unwrap_or(0);
+        let max_deg = (0..n).map(|i| xadj[i + 1] - xadj[i]).max().unwrap_or(0);
         if c_cut != r_cut || c_part != r_part {
             eprintln!("FAIL: {}x{} tri mesh, {} dual vertices, max_deg={}, nparts={}: C_cut={} Rust_cut={}",
                 rows, cols, ne_count, max_deg, nparts, c_cut, r_cut);
         } else {
-            eprintln!("PASS: {}x{} tri mesh, {} dual vertices, max_deg={}, nparts={}: cut={}",
-                rows, cols, ne_count, max_deg, nparts, c_cut);
+            eprintln!(
+                "PASS: {}x{} tri mesh, {} dual vertices, max_deg={}, nparts={}: cut={}",
+                rows, cols, ne_count, max_deg, nparts, c_cut
+            );
         }
     }
 }
-

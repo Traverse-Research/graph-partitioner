@@ -1,13 +1,20 @@
-use crate::types::{Idx, Real};
+use super::balance::{
+    better_balance_2way, compute_load_imbalance_diff_vec, iargmax_nrm, select_queue,
+};
 use crate::ctrl::Control;
 use crate::graph::GraphData;
+use crate::types::{Idx, Real};
 use crate::util::pqueue::PQueue;
-use super::balance::{iargmax_nrm, compute_load_imbalance_diff_vec, better_balance_2way, select_queue};
 
 /// FM 2-way cut refinement with rollback (single constraint).
 /// Matches METIS FM_2WayCutRefine.
 #[allow(unused_assignments)]
-pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niter: Idx) {
+pub fn fm_2way_cut_refine(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    target_part_weights: &[Real],
+    niter: Idx,
+) {
     let num_vertices = graph.num_vertices as usize;
     if graph.num_boundary <= 0 {
         return;
@@ -16,7 +23,8 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
     // Integer target weights
     let itarget_part_weights = [
         (graph.total_vertex_weight[0] as Real * target_part_weights[0]) as Idx,
-        graph.total_vertex_weight[0] - (graph.total_vertex_weight[0] as Real * target_part_weights[0]) as Idx,
+        graph.total_vertex_weight[0]
+            - (graph.total_vertex_weight[0] as Real * target_part_weights[0]) as Idx,
     ];
 
     let limit = (0.01 * num_vertices as f64).max(15.0).min(100.0) as usize;
@@ -42,10 +50,17 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
         let num_boundary = graph.num_boundary as usize;
         let mut perm = vec![0 as Idx; num_boundary];
         if num_boundary < 10 {
-            ctrl.rng.rand_array_permute(num_boundary, &mut perm, 0, true);
+            ctrl.rng
+                .rand_array_permute(num_boundary, &mut perm, 0, true);
         } else {
             // C METIS FM_2WayCutRefine: irandArrayPermute(num_boundary, perm, num_boundary, 1)
-            ctrl.rng.rand_array_permute_with_nshuffles(num_boundary, &mut perm, 0, num_boundary, true);
+            ctrl.rng.rand_array_permute_with_nshuffles(
+                num_boundary,
+                &mut perm,
+                0,
+                num_boundary,
+                true,
+            );
         }
 
         for ii in 0..num_boundary {
@@ -58,7 +73,9 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
 
         loop {
             // Select source partition (overweight side)
-            let from = if itarget_part_weights[0] - graph.part_weights[0] < itarget_part_weights[1] - graph.part_weights[1] {
+            let from = if itarget_part_weights[0] - graph.part_weights[0]
+                < itarget_part_weights[1] - graph.part_weights[1]
+            {
                 0
             } else {
                 1
@@ -104,7 +121,9 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
             graph.external_degree[best_vertex] = tmp;
 
             // Update boundary of moved vertex
-            if graph.external_degree[best_vertex] == 0 && graph.xadj[best_vertex] < graph.xadj[best_vertex + 1] {
+            if graph.external_degree[best_vertex] == 0
+                && graph.xadj[best_vertex] < graph.xadj[best_vertex + 1]
+            {
                 graph.remove_from_boundary(best_vertex);
             }
 
@@ -129,14 +148,20 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
                             queues[graph.partition[k] as usize].delete(k as Idx);
                         }
                     } else if moved[k] == -1 {
-                        queues[graph.partition[k] as usize].update(k as Idx, (graph.external_degree[k] - graph.internal_degree[k]) as f64);
+                        queues[graph.partition[k] as usize].update(
+                            k as Idx,
+                            (graph.external_degree[k] - graph.internal_degree[k]) as f64,
+                        );
                     }
                 } else {
                     // k is not on boundary
                     if graph.external_degree[k] > 0 {
                         graph.add_to_boundary(k);
                         if moved[k] == -1 {
-                            queues[graph.partition[k] as usize].insert(k as Idx, (graph.external_degree[k] - graph.internal_degree[k]) as f64);
+                            queues[graph.partition[k] as usize].insert(
+                                k as Idx,
+                                (graph.external_degree[k] - graph.internal_degree[k]) as f64,
+                            );
                         }
                     }
                 }
@@ -151,7 +176,11 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
             moved[swaps[i] as usize] = -1;
         }
 
-        let rollback_start = if edge_cutorder < 0 { 0 } else { edge_cutorder as usize + 1 };
+        let rollback_start = if edge_cutorder < 0 {
+            0
+        } else {
+            edge_cutorder as usize + 1
+        };
         for i in (rollback_start..nswaps).rev() {
             let best_vertex = swaps[i] as usize;
             let to = graph.partition[best_vertex] as usize;
@@ -169,7 +198,9 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
             graph.part_weights[to] -= graph.vertex_weights[best_vertex];
 
             // Fix boundary
-            if graph.external_degree[best_vertex] == 0 && graph.xadj[best_vertex] < graph.xadj[best_vertex + 1] {
+            if graph.external_degree[best_vertex] == 0
+                && graph.xadj[best_vertex] < graph.xadj[best_vertex + 1]
+            {
                 graph.remove_from_boundary(best_vertex);
             } else if graph.boundary_map[best_vertex] == -1 {
                 graph.add_to_boundary(best_vertex);
@@ -187,7 +218,10 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
                 graph.internal_degree[k] += weight_delta;
                 graph.external_degree[k] -= weight_delta;
 
-                if graph.boundary_map[k] != -1 && graph.external_degree[k] == 0 && graph.xadj[k] < graph.xadj[k + 1] {
+                if graph.boundary_map[k] != -1
+                    && graph.external_degree[k] == 0
+                    && graph.xadj[k] < graph.xadj[k + 1]
+                {
                     graph.remove_from_boundary(k);
                 } else if graph.boundary_map[k] == -1 && graph.external_degree[k] > 0 {
                     graph.add_to_boundary(k);
@@ -205,7 +239,12 @@ pub fn fm_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, target_part
 
 /// FM_2WayRefine dispatcher: calls FM_2WayCutRefine for ncon==1,
 /// FM_Mc2WayCutRefine for ncon > 1.
-pub fn fm_2way_refine(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niter: Idx) {
+pub fn fm_2way_refine(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    target_part_weights: &[Real],
+    niter: Idx,
+) {
     if graph.num_constraints == 1 {
         fm_2way_cut_refine(ctrl, graph, target_part_weights, niter);
     } else {
@@ -226,7 +265,12 @@ pub fn fm_2way_refine(ctrl: &mut Control, graph: &mut GraphData, target_part_wei
 ///                   (newbal == minbal && BetterBalance2Way)))
 /// - Rollback to best position
 #[allow(unused_assignments)]
-pub fn fm_mc_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, _target_part_weights: &[Real], niter: Idx) {
+pub fn fm_mc_2way_cut_refine(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    _target_part_weights: &[Real],
+    niter: Idx,
+) {
     let num_vertices = graph.num_vertices as usize;
     let ncon = graph.num_constraints as usize;
 
@@ -243,13 +287,22 @@ pub fn fm_mc_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, _target_
     // Compute qnum for each vertex
     let mut qnum = vec![0usize; num_vertices];
     for i in 0..num_vertices {
-        qnum[i] = iargmax_nrm(ncon, &graph.vertex_weights[i * ncon..(i + 1) * ncon], &graph.inv_total_vertex_weight);
+        qnum[i] = iargmax_nrm(
+            ncon,
+            &graph.vertex_weights[i * ncon..(i + 1) * ncon],
+            &graph.inv_total_vertex_weight,
+        );
     }
 
     // Compute ubfactors: relaxed tolerance = max(current_imbalance, ctrl.imbalance_tols)
     let mut ubfactors = vec![0.0 as Real; ncon];
     let origbal = compute_load_imbalance_diff_vec(
-        &graph.part_weights, ncon, 2, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols, &mut ubfactors,
+        &graph.part_weights,
+        ncon,
+        2,
+        &ctrl.partition_ij_balance_multipliers,
+        &ctrl.imbalance_tols,
+        &mut ubfactors,
     );
     for i in 0..ncon {
         ubfactors[i] = if ubfactors[i] > 0.0 {
@@ -274,16 +327,28 @@ pub fn fm_mc_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, _target_
 
         let mut minbalv = vec![0.0 as Real; ncon];
         let mut minbal = compute_load_imbalance_diff_vec(
-            &graph.part_weights, ncon, 2, &ctrl.partition_ij_balance_multipliers, &ubfactors, &mut minbalv,
+            &graph.part_weights,
+            ncon,
+            2,
+            &ctrl.partition_ij_balance_multipliers,
+            &ubfactors,
+            &mut minbalv,
         );
 
         // Insert boundary vertices into PQs
         let num_boundary = graph.num_boundary as usize;
         let mut perm = vec![0 as Idx; num_boundary];
         if num_boundary < 10 {
-            ctrl.rng.rand_array_permute(num_boundary, &mut perm, 0, true);
+            ctrl.rng
+                .rand_array_permute(num_boundary, &mut perm, 0, true);
         } else {
-            ctrl.rng.rand_array_permute_with_nshuffles(num_boundary, &mut perm, 0, num_boundary / 5, true);
+            ctrl.rng.rand_array_permute_with_nshuffles(
+                num_boundary,
+                &mut perm,
+                0,
+                num_boundary / 5,
+                true,
+            );
         }
 
         for ii in 0..num_boundary {
@@ -301,7 +366,11 @@ pub fn fm_mc_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, _target_
             }
 
             let (from, cnum) = select_queue(
-                &graph.part_weights, ncon, &ctrl.partition_ij_balance_multipliers, &ubfactors, &queues,
+                &graph.part_weights,
+                ncon,
+                &ctrl.partition_ij_balance_multipliers,
+                &ubfactors,
+                &queues,
             );
             let to = if from >= 0 { (from + 1) % 2 } else { -1 };
 
@@ -318,12 +387,19 @@ pub fn fm_mc_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, _target_
 
             // Update part_weights
             for j in 0..ncon {
-                graph.part_weights[to as usize * ncon + j] += graph.vertex_weights[higain * ncon + j];
-                graph.part_weights[from as usize * ncon + j] -= graph.vertex_weights[higain * ncon + j];
+                graph.part_weights[to as usize * ncon + j] +=
+                    graph.vertex_weights[higain * ncon + j];
+                graph.part_weights[from as usize * ncon + j] -=
+                    graph.vertex_weights[higain * ncon + j];
             }
 
             let newbal = compute_load_imbalance_diff_vec(
-                &graph.part_weights, ncon, 2, &ctrl.partition_ij_balance_multipliers, &ubfactors, &mut newbalv,
+                &graph.part_weights,
+                ncon,
+                2,
+                &ctrl.partition_ij_balance_multipliers,
+                &ubfactors,
+                &mut newbalv,
             );
 
             if (newcut < mincut && newbal <= ffactor)
@@ -339,8 +415,10 @@ pub fn fm_mc_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, _target_
                 // Undo last move
                 newcut += graph.external_degree[higain] - graph.internal_degree[higain];
                 for j in 0..ncon {
-                    graph.part_weights[from as usize * ncon + j] += graph.vertex_weights[higain * ncon + j];
-                    graph.part_weights[to as usize * ncon + j] -= graph.vertex_weights[higain * ncon + j];
+                    graph.part_weights[from as usize * ncon + j] +=
+                        graph.vertex_weights[higain * ncon + j];
+                    graph.part_weights[to as usize * ncon + j] -=
+                        graph.vertex_weights[higain * ncon + j];
                 }
                 break;
             }
@@ -378,14 +456,16 @@ pub fn fm_mc_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, _target_
                         }
                     } else if moved[k] == -1 {
                         let rgain = graph.external_degree[k] - graph.internal_degree[k];
-                        queues[2 * qnum[k] + graph.partition[k] as usize].update(k as Idx, rgain as f64);
+                        queues[2 * qnum[k] + graph.partition[k] as usize]
+                            .update(k as Idx, rgain as f64);
                     }
                 } else {
                     if graph.external_degree[k] > 0 {
                         graph.add_to_boundary(k);
                         if moved[k] == -1 {
                             let rgain = graph.external_degree[k] - graph.internal_degree[k];
-                            queues[2 * qnum[k] + graph.partition[k] as usize].insert(k as Idx, rgain as f64);
+                            queues[2 * qnum[k] + graph.partition[k] as usize]
+                                .insert(k as Idx, rgain as f64);
                         }
                     }
                 }
@@ -410,15 +490,20 @@ pub fn fm_mc_2way_cut_refine(ctrl: &mut Control, graph: &mut GraphData, _target_
                 graph.internal_degree[higain] = graph.external_degree[higain];
                 graph.external_degree[higain] = tmp;
 
-                if graph.external_degree[higain] == 0 && graph.boundary_map[higain] != -1 && graph.xadj[higain] < graph.xadj[higain + 1] {
+                if graph.external_degree[higain] == 0
+                    && graph.boundary_map[higain] != -1
+                    && graph.xadj[higain] < graph.xadj[higain + 1]
+                {
                     graph.remove_from_boundary(higain);
                 } else if graph.external_degree[higain] > 0 && graph.boundary_map[higain] == -1 {
                     graph.add_to_boundary(higain);
                 }
 
                 for j in 0..ncon {
-                    graph.part_weights[to as usize * ncon + j] += graph.vertex_weights[higain * ncon + j];
-                    graph.part_weights[((to as usize + 1) % 2) * ncon + j] -= graph.vertex_weights[higain * ncon + j];
+                    graph.part_weights[to as usize * ncon + j] +=
+                        graph.vertex_weights[higain * ncon + j];
+                    graph.part_weights[((to as usize + 1) % 2) * ncon + j] -=
+                        graph.vertex_weights[higain * ncon + j];
                 }
 
                 for kk in graph.xadj[higain] as usize..graph.xadj[higain + 1] as usize {

@@ -1,5 +1,5 @@
-use crate::types::{Idx, Real};
 use crate::graph::GraphData;
+use crate::types::{Idx, Real};
 
 /// Create an internal graph from CSR arrays.
 pub fn setup_graph(

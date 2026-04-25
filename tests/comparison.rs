@@ -25,15 +25,25 @@ fn compare_part_kway(xadj: &[i32], adjacency: &[i32], nparts: i32, seed: i32) {
         assert!(
             r_part[i] >= 0 && r_part[i] < nparts,
             "Rust partition[{}] = {} out of range [0, {})",
-            i, r_part[i], nparts
+            i,
+            r_part[i],
+            nparts
         );
     }
 
     // Check edge cut matches
-    assert_eq!(c_cut, r_cut, "Edge cuts differ (seed={}, nparts={}): C={}, Rust={}", seed, nparts, c_cut, r_cut);
+    assert_eq!(
+        c_cut, r_cut,
+        "Edge cuts differ (seed={}, nparts={}): C={}, Rust={}",
+        seed, nparts, c_cut, r_cut
+    );
 
     // Check partition arrays match
-    assert_eq!(c_part, r_part, "Partitions differ (seed={}, nparts={})", seed, nparts);
+    assert_eq!(
+        c_part, r_part,
+        "Partitions differ (seed={}, nparts={})",
+        seed, nparts
+    );
 }
 
 #[allow(dead_code)]
@@ -70,12 +80,26 @@ fn compare_part_kway_weighted(
         assert!(r_part[i] >= 0 && r_part[i] < nparts);
     }
 
-    assert_eq!(c_cut, r_cut, "Edge cuts differ (weighted, seed={}, nparts={})", seed, nparts);
-    assert_eq!(c_part, r_part, "Partitions differ (weighted, seed={}, nparts={})", seed, nparts);
+    assert_eq!(
+        c_cut, r_cut,
+        "Edge cuts differ (weighted, seed={}, nparts={})",
+        seed, nparts
+    );
+    assert_eq!(
+        c_part, r_part,
+        "Partitions differ (weighted, seed={}, nparts={})",
+        seed, nparts
+    );
 }
 
 /// Helper for mesh part_dual.
-fn compare_part_dual(element_offsets: &[i32], element_indices: &[i32], nn: i32, nparts: i32, seed: i32) {
+fn compare_part_dual(
+    element_offsets: &[i32],
+    element_indices: &[i32],
+    nn: i32,
+    nparts: i32,
+    seed: i32,
+) {
     let ne = element_offsets.len() - 1;
     let mut c_epart = vec![0i32; ne];
     let mut c_npart = vec![0i32; nn as usize];
@@ -102,9 +126,21 @@ fn compare_part_dual(element_offsets: &[i32], element_indices: &[i32], nn: i32, 
         assert!(r_npart[i] >= 0 && r_npart[i] < nparts);
     }
 
-    assert_eq!(c_cut, r_cut, "Mesh edge cuts differ (seed={}, nparts={})", seed, nparts);
-    assert_eq!(c_epart, r_epart, "Element partitions differ (seed={}, nparts={})", seed, nparts);
-    assert_eq!(c_npart, r_npart, "Node partitions differ (seed={}, nparts={})", seed, nparts);
+    assert_eq!(
+        c_cut, r_cut,
+        "Mesh edge cuts differ (seed={}, nparts={})",
+        seed, nparts
+    );
+    assert_eq!(
+        c_epart, r_epart,
+        "Element partitions differ (seed={}, nparts={})",
+        seed, nparts
+    );
+    assert_eq!(
+        c_npart, r_npart,
+        "Node partitions differ (seed={}, nparts={})",
+        seed, nparts
+    );
 }
 
 /// Helper: run part_kway with multi-constraint weights on both implementations and compare.
@@ -139,7 +175,12 @@ fn compare_part_kway_mc(
         assert!(
             r_part[i] >= 0 && r_part[i] < nparts,
             "Rust mc partition[{}] = {} out of range [0, {}) (seed={}, ncon={}, nparts={})",
-            i, r_part[i], nparts, seed, ncon, nparts
+            i,
+            r_part[i],
+            nparts,
+            seed,
+            ncon,
+            nparts
         );
     }
 
@@ -252,12 +293,22 @@ fn compare_part_recursive(xadj: &[i32], adjacency: &[i32], nparts: i32, seed: i3
         assert!(
             r_part[i] >= 0 && r_part[i] < nparts,
             "Rust recursive partition[{}] = {} out of range [0, {})",
-            i, r_part[i], nparts
+            i,
+            r_part[i],
+            nparts
         );
     }
 
-    assert_eq!(c_cut, r_cut, "Recursive edge cuts differ (seed={}, nparts={}): C={}, Rust={}", seed, nparts, c_cut, r_cut);
-    assert_eq!(c_part, r_part, "Recursive partitions differ (seed={}, nparts={})", seed, nparts);
+    assert_eq!(
+        c_cut, r_cut,
+        "Recursive edge cuts differ (seed={}, nparts={}): C={}, Rust={}",
+        seed, nparts, c_cut, r_cut
+    );
+    assert_eq!(
+        c_part, r_part,
+        "Recursive partitions differ (seed={}, nparts={})",
+        seed, nparts
+    );
 }
 
 // ========= part_recursive comparison tests =========
@@ -381,7 +432,12 @@ fn test_grid_3x5_valid() {
             .part_kway(&mut part)
             .unwrap();
         for &p in &part {
-            assert!(p >= 0 && p < nparts, "partition {} out of range for nparts={}", p, nparts);
+            assert!(
+                p >= 0 && p < nparts,
+                "partition {} out of range for nparts={}",
+                p,
+                nparts
+            );
         }
         assert!(cut >= 0);
     }
@@ -424,16 +480,16 @@ fn compare_10v_subgraph() {
     // 10v subgraph (original adjacency order, no reordering)
     let xadj = vec![0, 2, 5, 8, 9, 12, 16, 19, 21, 24, 26];
     let adjacency = vec![
-        1, 4,           // v0
-        0, 2, 5,        // v1
-        1, 3, 6,        // v2
-        2,              // v3
-        0, 5, 7,        // v4
-        1, 4, 6, 8,     // v5
-        2, 5, 9,        // v6
-        4, 8,           // v7
-        5, 7, 9,        // v8
-        6, 8,           // v9
+        1, 4, // v0
+        0, 2, 5, // v1
+        1, 3, 6, // v2
+        2, // v3
+        0, 5, 7, // v4
+        1, 4, 6, 8, // v5
+        2, 5, 9, // v6
+        4, 8, // v7
+        5, 7, 9, // v8
+        6, 8, // v9
     ];
     for &seed in &[42, 0, -1, 1128597453] {
         compare_part_kway(&xadj, &adjacency, 2, seed);
@@ -528,5 +584,28 @@ fn compare_quad_mesh_dual() {
     let (element_offsets, element_indices, nn) = quad_mesh();
     for &seed in &[42, 0] {
         compare_part_dual(&element_offsets, &element_indices, nn, 2, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_meshlet_grid_dual_450t_4p() {
+    // Regression: this fixture is the dual graph of a 16×16 quad-grid mesh
+    // (`ncommon=2`) captured from `breda-mesh`'s meshlet builder. Partitioning
+    // it into 4 parts with `Graph::part_recursive` exposes a divergence between
+    // graph-partitioner and C metis that propagates as a one-triangle drift in
+    // the downstream Nanite golden snapshot.
+    let (xadj, adjacency) = meshlet_grid_dual_450t_4p();
+    for &seed in &[42, 0, 12345] {
+        compare_part_recursive(&xadj, &adjacency, 4, seed);
+    }
+}
+
+#[test]
+fn compare_recursive_meshlet_grid_dual_247t_2p() {
+    // Second connected component of the same 16×16 quad-grid mesh as
+    // `compare_recursive_meshlet_grid_dual_450t_4p`. 247 elements / 2 parts.
+    let (xadj, adjacency) = meshlet_grid_dual_247t_2p();
+    for &seed in &[42, 0, 12345] {
+        compare_part_recursive(&xadj, &adjacency, 2, seed);
     }
 }

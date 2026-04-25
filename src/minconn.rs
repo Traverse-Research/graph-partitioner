@@ -1,6 +1,6 @@
-use crate::types::Idx;
 use crate::ctrl::Control;
 use crate::graph::GraphData;
+use crate::types::Idx;
 
 #[expect(dead_code)]
 /// Compute the subdomain graph (partition adjacency graph).
