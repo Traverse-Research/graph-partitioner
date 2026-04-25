@@ -7,7 +7,7 @@ jobs:
     name: Check and Lint
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Cargo check
         run: cargo check --workspace --all-targets
       - name: Cargo fmt
