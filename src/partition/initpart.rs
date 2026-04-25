@@ -1,6 +1,6 @@
-use crate::types::{Idx, Real};
 use crate::ctrl::Control;
 use crate::graph::GraphData;
+use crate::types::{Idx, Real};
 
 /// Initialize a 2-way partition on the coarsest graph. Tries niparts attempts.
 ///
@@ -9,7 +9,12 @@ use crate::graph::GraphData;
 /// - iptype==RANDOM && ncon>1: McRandomBisection
 /// - iptype==GROW && ncon==1: GrowBisection (fallback to Random if no edges)
 /// - iptype==GROW && ncon>1: McGrowBisection (fallback to McRandom if no edges)
-pub fn init_2way_partition(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
+pub fn init_2way_partition(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    target_part_weights: &[Real],
+    niparts: Idx,
+) {
     graph.alloc_2way();
 
     let ncon = graph.num_constraints as usize;
@@ -43,7 +48,12 @@ pub fn init_2way_partition(ctrl: &mut Control, graph: &mut GraphData, target_par
 }
 
 /// RandomBisection loop: for ncon==1, try niparts random bisections.
-fn random_bisection_loop(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
+fn random_bisection_loop(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    target_part_weights: &[Real],
+    niparts: Idx,
+) {
     let mut bestcut = Idx::MAX;
     let mut bestwhere = vec![0 as Idx; graph.num_vertices as usize];
 
@@ -68,7 +78,12 @@ fn random_bisection_loop(ctrl: &mut Control, graph: &mut GraphData, target_part_
 }
 
 /// GrowBisection loop: for ncon==1, try niparts grow bisections.
-fn grow_bisection_loop(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
+fn grow_bisection_loop(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    target_part_weights: &[Real],
+    niparts: Idx,
+) {
     let mut bestcut = Idx::MAX;
     let mut bestwhere = vec![0 as Idx; graph.num_vertices as usize];
 
@@ -100,7 +115,12 @@ fn grow_bisection_loop(ctrl: &mut Control, graph: &mut GraphData, target_part_we
 /// - Compute2WayPartitionParams
 /// - FM_2WayRefine → Balance2Way → FM → Balance → FM (3 FM + 2 Balance)
 /// - Best cut: bestcut >= graph->mincut (note >=, not >)
-fn mc_random_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
+fn mc_random_bisection(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    target_part_weights: &[Real],
+    niparts: Idx,
+) {
     let num_vertices = graph.num_vertices as usize;
     let ncon = graph.num_constraints as usize;
 
@@ -111,10 +131,18 @@ fn mc_random_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_we
 
     for inbfs in 0..(2 * niparts) {
         // Permute vertices
-        ctrl.rng.rand_array_permute_with_nshuffles(num_vertices, &mut perm, 0, num_vertices / 2, true);
+        ctrl.rng.rand_array_permute_with_nshuffles(
+            num_vertices,
+            &mut perm,
+            0,
+            num_vertices / 2,
+            true,
+        );
 
         // Reset counts
-        for c in counts.iter_mut() { *c = 0; }
+        for c in counts.iter_mut() {
+            *c = 0;
+        }
 
         // Assign vertices by round-robin on dominant constraint
         for ii in 0..num_vertices {
@@ -160,7 +188,12 @@ fn mc_random_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_we
 /// - Compute2WayPartitionParams
 /// - Balance2Way → FM → Balance → FM (2 FM + 2 Balance)
 /// - Best cut: bestcut >= graph->mincut
-fn mc_grow_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real], niparts: Idx) {
+fn mc_grow_bisection(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    target_part_weights: &[Real],
+    niparts: Idx,
+) {
     let num_vertices = graph.num_vertices as usize;
 
     let mut bestcut = Idx::MAX;
@@ -202,8 +235,12 @@ fn grow_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights
     let ncon = graph.num_constraints as usize;
 
     // Target weights for partition 1
-    let max_target_weight = (ctrl.imbalance_tols[0] * graph.total_vertex_weight[0] as Real * target_part_weights[ncon]) as Idx;
-    let min_target_weight = ((1.0 / ctrl.imbalance_tols[0]) * graph.total_vertex_weight[0] as Real * target_part_weights[ncon]) as Idx;
+    let max_target_weight = (ctrl.imbalance_tols[0]
+        * graph.total_vertex_weight[0] as Real
+        * target_part_weights[ncon]) as Idx;
+    let min_target_weight = ((1.0 / ctrl.imbalance_tols[0])
+        * graph.total_vertex_weight[0] as Real
+        * target_part_weights[ncon]) as Idx;
 
     // Initialize all to partition 1
     for i in 0..num_vertices {
@@ -294,7 +331,9 @@ fn grow_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights
 fn random_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weights: &[Real]) {
     let num_vertices = graph.num_vertices as usize;
 
-    let max_zero_weight = (ctrl.imbalance_tols[0] * graph.total_vertex_weight[0] as Real * target_part_weights[0]) as Idx;
+    let max_zero_weight = (ctrl.imbalance_tols[0]
+        * graph.total_vertex_weight[0] as Real
+        * target_part_weights[0]) as Idx;
 
     for i in 0..num_vertices {
         graph.partition[i] = 1;
@@ -302,7 +341,8 @@ fn random_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weigh
 
     if num_vertices < 10 {
         let mut perm = vec![0 as Idx; num_vertices];
-        ctrl.rng.rand_array_permute(num_vertices, &mut perm, 0, true);
+        ctrl.rng
+            .rand_array_permute(num_vertices, &mut perm, 0, true);
 
         let mut pwgt0 = 0 as Idx;
         for &pi in &perm {
@@ -315,7 +355,8 @@ fn random_bisection(ctrl: &mut Control, graph: &mut GraphData, target_part_weigh
     } else {
         let mut perm = vec![0 as Idx; num_vertices];
         let nshuffles = num_vertices / 2;
-        ctrl.rng.rand_array_permute_with_nshuffles(num_vertices, &mut perm, 0, nshuffles, true);
+        ctrl.rng
+            .rand_array_permute_with_nshuffles(num_vertices, &mut perm, 0, nshuffles, true);
 
         let mut pwgt0 = 0 as Idx;
         for &pi in &perm {

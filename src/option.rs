@@ -104,15 +104,33 @@ pub struct DbgLvl {
 impl DbgLvl {
     pub(crate) fn value(self) -> Idx {
         let mut v: Idx = 0;
-        if self.info { v |= 1; }
-        if self.time { v |= 2; }
-        if self.coarsen { v |= 4; }
-        if self.refine { v |= 8; }
-        if self.ipart { v |= 16; }
-        if self.move_info { v |= 32; }
-        if self.sep_info { v |= 64; }
-        if self.conn_info { v |= 128; }
-        if self.contig_info { v |= 256; }
+        if self.info {
+            v |= 1;
+        }
+        if self.time {
+            v |= 2;
+        }
+        if self.coarsen {
+            v |= 4;
+        }
+        if self.refine {
+            v |= 8;
+        }
+        if self.ipart {
+            v |= 16;
+        }
+        if self.move_info {
+            v |= 32;
+        }
+        if self.sep_info {
+            v |= 64;
+        }
+        if self.conn_info {
+            v |= 128;
+        }
+        if self.contig_info {
+            v |= 256;
+        }
         v
     }
 }

@@ -2,7 +2,6 @@
 ///
 /// This calls METIS_PartGraphRecursive directly via FFI to understand what
 /// the inner recursive bisection produces.
-
 extern crate metis_sys;
 
 use metis_sys::*;
@@ -44,7 +43,10 @@ fn debug_c_recursive_irregular_6v() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphRecursive (seed=-1): ret={}, edgecut={}, part={:?}", ret, edgecut, part);
+    eprintln!(
+        "DEBUG C METIS PartGraphRecursive (seed=-1): ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
 
     // Now try with seed=42
     options[9] = 42;
@@ -68,7 +70,10 @@ fn debug_c_recursive_irregular_6v() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphRecursive (seed=42): ret={}, edgecut={}, part={:?}", ret2, edgecut2, part2);
+    eprintln!(
+        "DEBUG C METIS PartGraphRecursive (seed=42): ret={}, edgecut={}, part={:?}",
+        ret2, edgecut2, part2
+    );
 }
 
 /// Call PartGraphRecursive on the coarsened graph to simulate what InitKWayPartitioning does.
@@ -88,8 +93,8 @@ fn debug_c_recursive_coarsened_6v() {
         METIS_SetDefaultOptions(options.as_mut_ptr());
     }
     // Match the inner PMETIS parameters:
-    options[8] = 4;  // NCUTS = 4 (ctrl->niparts)
-    options[9] = -1;  // Seed = -1
+    options[8] = 4; // NCUTS = 4 (ctrl->niparts)
+    options[9] = -1; // Seed = -1
 
     let mut edgecut: idx_t = 0;
     let mut part = vec![0 as idx_t; 6];
@@ -112,7 +117,10 @@ fn debug_c_recursive_coarsened_6v() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphRecursive on coarsened graph: ret={}, edgecut={}, part={:?}", ret, edgecut, part);
+    eprintln!(
+        "DEBUG C METIS PartGraphRecursive on coarsened graph: ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
 }
 
 /// Replicate EXACTLY what InitKWayPartitioning does inside PartGraphKway.
@@ -135,10 +143,10 @@ fn debug_c_recursive_as_init_kway() {
         METIS_SetDefaultOptions(options.as_mut_ptr());
     }
     // Match InitKWayPartitioning exactly:
-    options[7] = 10;  // NITER = 10 (ctrl->niter default)
-    options[8] = 4;   // NCUTS = 4 (ctrl->nIparts)
-    // Seed stays -1 (default from METIS_SetDefaultOptions)
-    // OBJTYPE stays default (CUT)
+    options[7] = 10; // NITER = 10 (ctrl->niter default)
+    options[8] = 4; // NCUTS = 4 (ctrl->nIparts)
+                    // Seed stays -1 (default from METIS_SetDefaultOptions)
+                    // OBJTYPE stays default (CUT)
 
     // Compute ubvec as InitKWayPartitioning does:
     // ubvec[i] = pow(ctrl->imbalance_tols[i], 1.0/log(nparts))
@@ -169,7 +177,10 @@ fn debug_c_recursive_as_init_kway() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphRecursive (as InitKWayPartitioning): ret={}, edgecut={}, part={:?}", ret, edgecut, part);
+    eprintln!(
+        "DEBUG C METIS PartGraphRecursive (as InitKWayPartitioning): ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
 }
 
 /// DEFINITIVE test: Call PartGraphRecursive on the COARSENED graph
@@ -190,9 +201,9 @@ fn debug_c_recursive_coarsened_with_ubvec() {
         METIS_SetDefaultOptions(options.as_mut_ptr());
     }
     // Match InitKWayPartitioning exactly:
-    options[7] = 10;  // NITER = 10 (ctrl->niter default)
-    options[8] = 4;   // NCUTS = 4 (ctrl->nIparts)
-    // Seed stays -1 (default)
+    options[7] = 10; // NITER = 10 (ctrl->niter default)
+    options[8] = 4; // NCUTS = 4 (ctrl->nIparts)
+                    // Seed stays -1 (default)
 
     // Compute ubvec as InitKWayPartitioning does:
     // ubvec[i] = pow(ctrl->imbalance_tols[i], 1.0/log(nparts))
@@ -223,7 +234,10 @@ fn debug_c_recursive_coarsened_with_ubvec() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphRecursive (coarsened + ubvec): ret={}, edgecut={}, part={:?}", ret, edgecut, part);
+    eprintln!(
+        "DEBUG C METIS PartGraphRecursive (coarsened + ubvec): ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
 }
 
 /// Direct comparison of C rand() vs our Rust RNG (MSVC LCG)
@@ -242,7 +256,9 @@ fn debug_compare_rng() {
         for i in 0..20 {
             let v = rand();
             eprint!("{}", v);
-            if i < 19 { eprint!(", "); }
+            if i < 19 {
+                eprint!(", ");
+            }
         }
         eprintln!();
     }
@@ -254,19 +270,25 @@ fn debug_compare_rng() {
         state = state.wrapping_mul(214013).wrapping_add(2531011);
         let v = ((state >> 16) & 0x7fff) as i32;
         eprint!("{}", v);
-        if i < 19 { eprint!(", "); }
+        if i < 19 {
+            eprint!(", ");
+        }
     }
     eprintln!();
 
     // Also compare after 12 calls (the point where GrowBisection starts)
     unsafe {
         srand(4321);
-        for _ in 0..12 { rand(); }
+        for _ in 0..12 {
+            rand();
+        }
         eprint!("C rand()%6 after 12 calls:  ");
         for i in 0..10 {
             let v = rand() % 6;
             eprint!("{}", v);
-            if i < 9 { eprint!(", "); }
+            if i < 9 {
+                eprint!(", ");
+            }
         }
         eprintln!();
     }
@@ -280,7 +302,9 @@ fn debug_compare_rng() {
         state2 = state2.wrapping_mul(214013).wrapping_add(2531011);
         let v = ((state2 >> 16) & 0x7fff) as i32 % 6;
         eprint!("{}", v);
-        if i < 9 { eprint!(", "); }
+        if i < 9 {
+            eprint!(", ");
+        }
     }
     eprintln!();
 }
@@ -303,8 +327,8 @@ fn debug_c_recursive_coarsened_ncuts1() {
         unsafe {
             METIS_SetDefaultOptions(options.as_mut_ptr());
         }
-        options[7] = 10;           // NITER = 10
-        options[8] = ncuts_val;    // NCUTS = ncuts_val
+        options[7] = 10; // NITER = 10
+        options[8] = ncuts_val; // NCUTS = ncuts_val
 
         let mut edgecut: idx_t = 0;
         let mut part = vec![0 as idx_t; 6];
@@ -327,8 +351,10 @@ fn debug_c_recursive_coarsened_ncuts1() {
             )
         };
 
-        eprintln!("DEBUG C METIS PartGraphRecursive (ncuts={}): ret={}, edgecut={}, part={:?}",
-            ncuts_val, ret, edgecut, part);
+        eprintln!(
+            "DEBUG C METIS PartGraphRecursive (ncuts={}): ret={}, edgecut={}, part={:?}",
+            ncuts_val, ret, edgecut, part
+        );
     }
 }
 
@@ -336,10 +362,37 @@ fn debug_c_recursive_coarsened_ncuts1() {
 /// This is the exact graph that init_kway_partition sees.
 #[test]
 fn debug_c_recursive_coarsened_53v() {
-    let mut xadj: Vec<idx_t> = vec![0, 3, 7, 12, 16, 21, 24, 27, 33, 37, 42, 47, 51, 55, 59, 65, 69, 75, 78, 83, 87, 91, 96, 101, 105, 108, 113, 116, 120, 126, 132, 137, 142, 146, 150, 155, 161, 167, 171, 175, 179, 184, 189, 194, 198, 203, 206, 210, 215, 218, 221, 225, 229, 232];
-    let mut adjacency: Vec<idx_t> = vec![7, 6, 1, 8, 0, 7, 2, 15, 1, 3, 8, 9, 10, 2, 9, 4, 16, 3, 5, 10, 11, 12, 4, 11, 13, 0, 7, 14, 0, 6, 13, 1, 8, 14, 1, 7, 2, 21, 3, 2, 10, 15, 22, 3, 9, 4, 16, 16, 5, 4, 12, 23, 5, 11, 16, 14, 6, 17, 7, 19, 7, 13, 18, 8, 15, 20, 2, 14, 9, 23, 4, 10, 22, 11, 12, 18, 13, 24, 28, 14, 17, 19, 24, 28, 14, 18, 20, 29, 15, 19, 21, 29, 9, 20, 22, 25, 23, 10, 21, 25, 16, 12, 16, 22, 26, 18, 17, 27, 31, 22, 21, 30, 26, 32, 23, 25, 34, 24, 33, 28, 35, 18, 27, 34, 19, 29, 36, 20, 28, 35, 21, 30, 42, 25, 29, 31, 36, 43, 25, 30, 32, 37, 38, 26, 31, 37, 45, 27, 34, 39, 35, 27, 33, 39, 28, 41, 28, 34, 40, 29, 36, 47, 29, 35, 30, 41, 42, 44, 32, 31, 38, 48, 32, 37, 44, 40, 34, 33, 46, 50, 35, 39, 41, 46, 50, 35, 40, 36, 47, 51, 36, 41, 42, 47, 51, 31, 42, 44, 52, 37, 43, 38, 48, 49, 33, 46, 40, 39, 45, 49, 51, 36, 41, 42, 50, 52, 38, 44, 50, 46, 45, 47, 40, 49, 41, 52, 42, 47, 43, 48, 44, 51];
-    let mut edge_weights: Vec<idx_t> = vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
-    let mut vertex_weights: Vec<idx_t> = vec![2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1];
+    let mut xadj: Vec<idx_t> = vec![
+        0, 3, 7, 12, 16, 21, 24, 27, 33, 37, 42, 47, 51, 55, 59, 65, 69, 75, 78, 83, 87, 91, 96,
+        101, 105, 108, 113, 116, 120, 126, 132, 137, 142, 146, 150, 155, 161, 167, 171, 175, 179,
+        184, 189, 194, 198, 203, 206, 210, 215, 218, 221, 225, 229, 232,
+    ];
+    let mut adjacency: Vec<idx_t> = vec![
+        7, 6, 1, 8, 0, 7, 2, 15, 1, 3, 8, 9, 10, 2, 9, 4, 16, 3, 5, 10, 11, 12, 4, 11, 13, 0, 7,
+        14, 0, 6, 13, 1, 8, 14, 1, 7, 2, 21, 3, 2, 10, 15, 22, 3, 9, 4, 16, 16, 5, 4, 12, 23, 5,
+        11, 16, 14, 6, 17, 7, 19, 7, 13, 18, 8, 15, 20, 2, 14, 9, 23, 4, 10, 22, 11, 12, 18, 13,
+        24, 28, 14, 17, 19, 24, 28, 14, 18, 20, 29, 15, 19, 21, 29, 9, 20, 22, 25, 23, 10, 21, 25,
+        16, 12, 16, 22, 26, 18, 17, 27, 31, 22, 21, 30, 26, 32, 23, 25, 34, 24, 33, 28, 35, 18, 27,
+        34, 19, 29, 36, 20, 28, 35, 21, 30, 42, 25, 29, 31, 36, 43, 25, 30, 32, 37, 38, 26, 31, 37,
+        45, 27, 34, 39, 35, 27, 33, 39, 28, 41, 28, 34, 40, 29, 36, 47, 29, 35, 30, 41, 42, 44, 32,
+        31, 38, 48, 32, 37, 44, 40, 34, 33, 46, 50, 35, 39, 41, 46, 50, 35, 40, 36, 47, 51, 36, 41,
+        42, 47, 51, 31, 42, 44, 52, 37, 43, 38, 48, 49, 33, 46, 40, 39, 45, 49, 51, 36, 41, 42, 50,
+        52, 38, 44, 50, 46, 45, 47, 40, 49, 41, 52, 42, 47, 43, 48, 44, 51,
+    ];
+    let mut edge_weights: Vec<idx_t> = vec![
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2,
+        2, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 2, 2, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1,
+        1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 2,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    ];
+    let mut vertex_weights: Vec<idx_t> = vec![
+        2, 2, 2, 2, 2, 2, 1, 2, 1, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1,
+    ];
     let mut num_vertices: idx_t = 53;
     let mut ncon: idx_t = 1;
     let mut nparts: idx_t = 2;
@@ -348,8 +401,8 @@ fn debug_c_recursive_coarsened_53v() {
     unsafe {
         METIS_SetDefaultOptions(options.as_mut_ptr());
     }
-    options[7] = 10;  // NITER = 10
-    options[8] = 4;   // NCUTS = 4 (ctrl->niparts)
+    options[7] = 10; // NITER = 10
+    options[8] = 4; // NCUTS = 4 (ctrl->niparts)
 
     // Compute ubvec as init_kway_partition does:
     // kway ctrl->imbalance_tols[0] = 1.0 + 0.001 * 30 + 0.0000499 = 1.0300499
@@ -360,7 +413,10 @@ fn debug_c_recursive_coarsened_53v() {
     let ubvec_val: f32 = (kway_ubfactor as f64).powf(1.0 / (2.0_f64).ln()) as f32;
     // Do NOT add 0.0000499 here — C's SetupCtrl adds it internally
     let mut ubvec = vec![ubvec_val];
-    eprintln!("DEBUG 53v ubvec_val = {} (C will add +0.0000499 internally)", ubvec_val);
+    eprintln!(
+        "DEBUG 53v ubvec_val = {} (C will add +0.0000499 internally)",
+        ubvec_val
+    );
 
     let mut edgecut: idx_t = 0;
     let mut part = vec![0 as idx_t; 53];
@@ -383,8 +439,10 @@ fn debug_c_recursive_coarsened_53v() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphRecursive on 53v (ncuts=4): ret={}, edgecut={}, part={:?}",
-        ret, edgecut, part);
+    eprintln!(
+        "DEBUG C METIS PartGraphRecursive on 53v (ncuts=4): ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
 
     // Also try ncuts=1 to see first iteration only
     options[8] = 1;
@@ -408,8 +466,10 @@ fn debug_c_recursive_coarsened_53v() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphRecursive on 53v (ncuts=1): ret={}, edgecut={}, part={:?}",
-        ret1, edgecut1, part1);
+    eprintln!(
+        "DEBUG C METIS PartGraphRecursive on 53v (ncuts=1): ret={}, edgecut={}, part={:?}",
+        ret1, edgecut1, part1
+    );
 }
 
 /// Call PartGraphRecursive with nparts=3 on grid_3x5 to match what init_kway_partition does.
@@ -428,10 +488,18 @@ fn debug_c_recursive_grid15_nparts3() {
     for r in 0..rows {
         for c in 0..cols {
             let v = r * cols + c;
-            if r > 0 { adjacency_vec.push((v - cols) as i32); }
-            if c > 0 { adjacency_vec.push((v - 1) as i32); }
-            if c + 1 < cols { adjacency_vec.push((v + 1) as i32); }
-            if r + 1 < rows { adjacency_vec.push((v + cols) as i32); }
+            if r > 0 {
+                adjacency_vec.push((v - cols) as i32);
+            }
+            if c > 0 {
+                adjacency_vec.push((v - 1) as i32);
+            }
+            if c + 1 < cols {
+                adjacency_vec.push((v + 1) as i32);
+            }
+            if r + 1 < rows {
+                adjacency_vec.push((v + cols) as i32);
+            }
             xadj[v + 1] = adjacency_vec.len() as i32;
         }
     }
@@ -441,9 +509,11 @@ fn debug_c_recursive_grid15_nparts3() {
     let mut nparts: idx_t = 3;
 
     let mut options = vec![0 as idx_t; 40];
-    unsafe { METIS_SetDefaultOptions(options.as_mut_ptr()); }
-    options[7] = 10;  // NITER = 10
-    options[8] = 4;   // NCUTS = 4
+    unsafe {
+        METIS_SetDefaultOptions(options.as_mut_ptr());
+    }
+    options[7] = 10; // NITER = 10
+    options[8] = 4; // NCUTS = 4
 
     // Compute ubvec as init_kway_partition does:
     // kway ctrl->imbalance_tols[0] = 1.0 + 0.001*30 + 0.0000499 = 1.0300499
@@ -474,12 +544,16 @@ fn debug_c_recursive_grid15_nparts3() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphRecursive (grid15, nparts=3): ret={}, edgecut={}, part={:?}",
-        ret, edgecut, part);
+    eprintln!(
+        "DEBUG C METIS PartGraphRecursive (grid15, nparts=3): ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
 
     // Also call PartGraphKway directly for comparison
     let mut kway_options = vec![0 as idx_t; 40];
-    unsafe { METIS_SetDefaultOptions(kway_options.as_mut_ptr()); }
+    unsafe {
+        METIS_SetDefaultOptions(kway_options.as_mut_ptr());
+    }
     kway_options[9] = 42; // Seed = 42
 
     let mut kway_edgecut: idx_t = 0;
@@ -504,8 +578,10 @@ fn debug_c_recursive_grid15_nparts3() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphKway (grid15, nparts=3, seed=42): ret={}, edgecut={}, part={:?}",
-        ret2, kway_edgecut, kway_part);
+    eprintln!(
+        "DEBUG C METIS PartGraphKway (grid15, nparts=3, seed=42): ret={}, edgecut={}, part={:?}",
+        ret2, kway_edgecut, kway_part
+    );
 }
 
 /// Isolate the FIRST bisection of the nparts=3 recursive bisection.
@@ -522,10 +598,18 @@ fn debug_c_recursive_grid15_first_bisection() {
     for r in 0..rows {
         for c in 0..cols {
             let v = r * cols + c;
-            if r > 0 { adjacency_vec.push((v - cols) as i32); }
-            if c > 0 { adjacency_vec.push((v - 1) as i32); }
-            if c + 1 < cols { adjacency_vec.push((v + 1) as i32); }
-            if r + 1 < rows { adjacency_vec.push((v + cols) as i32); }
+            if r > 0 {
+                adjacency_vec.push((v - cols) as i32);
+            }
+            if c > 0 {
+                adjacency_vec.push((v - 1) as i32);
+            }
+            if c + 1 < cols {
+                adjacency_vec.push((v + 1) as i32);
+            }
+            if r + 1 < rows {
+                adjacency_vec.push((v + cols) as i32);
+            }
             xadj[v + 1] = adjacency_vec.len() as i32;
         }
     }
@@ -535,9 +619,11 @@ fn debug_c_recursive_grid15_first_bisection() {
     let mut nparts: idx_t = 2;
 
     let mut options = vec![0 as idx_t; 40];
-    unsafe { METIS_SetDefaultOptions(options.as_mut_ptr()); }
-    options[7] = 10;  // NITER = 10
-    options[8] = 4;   // NCUTS = 4
+    unsafe {
+        METIS_SetDefaultOptions(options.as_mut_ptr());
+    }
+    options[7] = 10; // NITER = 10
+    options[8] = 4; // NCUTS = 4
 
     // ubvec same as for nparts=3 call
     let kway_ubfactor: f32 = 1.0 + 0.001 * 30.0 + 0.0000499;
@@ -606,16 +692,16 @@ fn debug_c_recursive_grid15_second_bisection() {
     // sub 9 (orig 12): [7, 11] → [sub 6, sub 8]  (orig neighbor 13 removed)
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 8, 9, 12, 16, 19, 21, 24, 26];
     let mut adjacency: Vec<idx_t> = vec![
-        1, 4,           // sub 0
-        0, 2, 5,        // sub 1
-        1, 3, 6,        // sub 2
-        2,              // sub 3
-        0, 5, 7,        // sub 4
-        1, 4, 6, 8,     // sub 5
-        2, 5, 9,        // sub 6
-        4, 8,           // sub 7
-        5, 7, 9,        // sub 8
-        6, 8,           // sub 9
+        1, 4, // sub 0
+        0, 2, 5, // sub 1
+        1, 3, 6, // sub 2
+        2, // sub 3
+        0, 5, 7, // sub 4
+        1, 4, 6, 8, // sub 5
+        2, 5, 9, // sub 6
+        4, 8, // sub 7
+        5, 7, 9, // sub 8
+        6, 8, // sub 9
     ];
 
     let mut num_vertices: idx_t = 10;
@@ -623,10 +709,12 @@ fn debug_c_recursive_grid15_second_bisection() {
     let mut nparts: idx_t = 2;
 
     let mut options = vec![0 as idx_t; 40];
-    unsafe { METIS_SetDefaultOptions(options.as_mut_ptr()); }
-    options[7] = 10;  // NITER = 10
-    options[8] = 4;   // NCUTS = 4
-    // Seed stays -1 (fresh start)
+    unsafe {
+        METIS_SetDefaultOptions(options.as_mut_ptr());
+    }
+    options[7] = 10; // NITER = 10
+    options[8] = 4; // NCUTS = 4
+                    // Seed stays -1 (fresh start)
 
     let kway_ubfactor: f32 = 1.0 + 0.001 * 30.0 + 0.0000499;
     let ubvec_val: f32 = (kway_ubfactor as f64).powf(1.0 / (3.0_f64).ln()) as f32;
@@ -653,8 +741,10 @@ fn debug_c_recursive_grid15_second_bisection() {
         )
     };
 
-    eprintln!("DEBUG C second bisection (10v subgraph, fresh seed): ret={}, edgecut={}, part={:?}",
-        ret, edgecut, part);
+    eprintln!(
+        "DEBUG C second bisection (10v subgraph, fresh seed): ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
 }
 
 /// Verify: Call C's PartGraphRecursive on 10v subgraph with seed=1128597453
@@ -666,16 +756,16 @@ fn debug_c_recursive_10v_with_state_700() {
     // Same 10v subgraph as debug_c_recursive_grid15_second_bisection
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 8, 9, 12, 16, 19, 21, 24, 26];
     let mut adjacency: Vec<idx_t> = vec![
-        1, 4,           // sub 0
-        0, 2, 5,        // sub 1
-        1, 3, 6,        // sub 2
-        2,              // sub 3
-        0, 5, 7,        // sub 4
-        1, 4, 6, 8,     // sub 5
-        2, 5, 9,        // sub 6
-        4, 8,           // sub 7
-        5, 7, 9,        // sub 8
-        6, 8,           // sub 9
+        1, 4, // sub 0
+        0, 2, 5, // sub 1
+        1, 3, 6, // sub 2
+        2, // sub 3
+        0, 5, 7, // sub 4
+        1, 4, 6, 8, // sub 5
+        2, 5, 9, // sub 6
+        4, 8, // sub 7
+        5, 7, 9, // sub 8
+        6, 8, // sub 9
     ];
 
     let mut num_vertices: idx_t = 10;
@@ -683,10 +773,12 @@ fn debug_c_recursive_10v_with_state_700() {
     let mut nparts: idx_t = 2;
 
     let mut options = vec![0 as idx_t; 40];
-    unsafe { METIS_SetDefaultOptions(options.as_mut_ptr()); }
-    options[7] = 10;           // NITER = 10
-    options[8] = 4;            // NCUTS = 4
-    options[9] = 1128597453;   // Seed = our RNG state after first bisection
+    unsafe {
+        METIS_SetDefaultOptions(options.as_mut_ptr());
+    }
+    options[7] = 10; // NITER = 10
+    options[8] = 4; // NCUTS = 4
+    options[9] = 1128597453; // Seed = our RNG state after first bisection
 
     let kway_ubfactor: f32 = 1.0 + 0.001 * 30.0 + 0.0000499;
     let ubvec_val: f32 = (kway_ubfactor as f64).powf(1.0 / (3.0_f64).ln()) as f32;
@@ -713,8 +805,10 @@ fn debug_c_recursive_10v_with_state_700() {
         )
     };
 
-    eprintln!("DEBUG C 10v with seed=1128597453 (state after 700 calls): ret={}, edgecut={}, part={:?}",
-        ret, edgecut, part);
+    eprintln!(
+        "DEBUG C 10v with seed=1128597453 (state after 700 calls): ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
     eprintln!("  Our second bisection result: where=[1, 0, 0, 0, 1, 0, 0, 1, 1, 1]");
     eprintln!("  If these match, C consumed different RNG calls in the first bisection.");
 }
@@ -848,16 +942,16 @@ fn debug_c_recursive_10v_reordered() {
     // Let me construct the correct 10v subgraph:
     let mut xadj: Vec<idx_t> = vec![0, 2, 5, 8, 9, 12, 16, 19, 21, 24, 26];
     let mut adjacency: Vec<idx_t> = vec![
-        4, 1,           // sub 0 (orig 0): parent [5, 1] → [sub4, sub1]
-        5, 0, 2,        // sub 1 (orig 1): parent [6, 0, 2] → [sub5, sub0, sub2]
-        6, 1, 3,        // sub 2 (orig 2): parent [7, 1, 3] → [sub6, sub1, sub3]
-        2,              // sub 3 (orig 3): parent [8, 2, 4] → remove 8,4 → [sub2]
-        7, 0, 5,        // sub 4 (orig 5): parent [10, 0, 6] → [sub7, sub0, sub5]
-        8, 1, 4, 6,     // sub 5 (orig 6): parent [11, 1, 5, 7] → [sub8, sub1, sub4, sub6]
-        9, 2, 5,        // sub 6 (orig 7): parent [12, 2, 6, 8] → remove 8 → [sub9, sub2, sub5]
-        4, 8,           // sub 7 (orig 10): parent [5, 11] → [sub4, sub8]
-        9, 5, 7,        // sub 8 (orig 11): parent [12, 6, 10] → [sub9, sub5, sub7]
-        6, 8,           // sub 9 (orig 12): parent [7, 11] → remove 13 → [sub6, sub8]
+        4, 1, // sub 0 (orig 0): parent [5, 1] → [sub4, sub1]
+        5, 0, 2, // sub 1 (orig 1): parent [6, 0, 2] → [sub5, sub0, sub2]
+        6, 1, 3, // sub 2 (orig 2): parent [7, 1, 3] → [sub6, sub1, sub3]
+        2, // sub 3 (orig 3): parent [8, 2, 4] → remove 8,4 → [sub2]
+        7, 0, 5, // sub 4 (orig 5): parent [10, 0, 6] → [sub7, sub0, sub5]
+        8, 1, 4, 6, // sub 5 (orig 6): parent [11, 1, 5, 7] → [sub8, sub1, sub4, sub6]
+        9, 2, 5, // sub 6 (orig 7): parent [12, 2, 6, 8] → remove 8 → [sub9, sub2, sub5]
+        4, 8, // sub 7 (orig 10): parent [5, 11] → [sub4, sub8]
+        9, 5, 7, // sub 8 (orig 11): parent [12, 6, 10] → [sub9, sub5, sub7]
+        6, 8, // sub 9 (orig 12): parent [7, 11] → remove 13 → [sub6, sub8]
     ];
     // Wait, v12 in the parent graph: xadj[12]=36, xadj[13]=39
     // adjacency[36..39] = [13, 7, 11]
@@ -875,10 +969,12 @@ fn debug_c_recursive_10v_reordered() {
     let mut nparts: idx_t = 2;
 
     let mut options = vec![0 as idx_t; 40];
-    unsafe { METIS_SetDefaultOptions(options.as_mut_ptr()); }
-    options[7] = 10;           // NITER = 10
-    options[8] = 4;            // NCUTS = 4
-    options[9] = 1128597453;   // Seed = our RNG state after first bisection (700 calls)
+    unsafe {
+        METIS_SetDefaultOptions(options.as_mut_ptr());
+    }
+    options[7] = 10; // NITER = 10
+    options[8] = 4; // NCUTS = 4
+    options[9] = 1128597453; // Seed = our RNG state after first bisection (700 calls)
 
     let kway_ubfactor: f32 = 1.0 + 0.001 * 30.0 + 0.0000499;
     let ubvec_val: f32 = (kway_ubfactor as f64).powf(1.0 / (3.0_f64).ln()) as f32;
@@ -905,8 +1001,10 @@ fn debug_c_recursive_10v_reordered() {
         )
     };
 
-    eprintln!("DEBUG C 10v reordered with seed=1128597453: ret={}, edgecut={}, part={:?}",
-        ret, edgecut, part);
+    eprintln!(
+        "DEBUG C 10v reordered with seed=1128597453: ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
     eprintln!("  Our second bisection result: where=[1, 0, 0, 0, 1, 0, 0, 1, 1, 1]");
 }
 
@@ -946,5 +1044,8 @@ fn debug_c_kway_irregular_6v() {
         )
     };
 
-    eprintln!("DEBUG C METIS PartGraphKway (seed=42, nparts=2): ret={}, edgecut={}, part={:?}", ret, edgecut, part);
+    eprintln!(
+        "DEBUG C METIS PartGraphKway (seed=42, nparts=2): ret={}, edgecut={}, part={:?}",
+        ret, edgecut, part
+    );
 }

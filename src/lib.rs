@@ -1,19 +1,19 @@
-pub mod option;
-mod types;
-mod rng;
-mod ctrl;
-mod graph;
-mod partition;
-mod mesh;
-mod util;
 mod balance_kway;
 mod contig;
+mod ctrl;
+mod graph;
+mod mesh;
 mod minconn;
+pub mod option;
+mod partition;
+mod rng;
+mod types;
+mod util;
 
-pub use types::{Idx, Real, Error, NewGraphError, NewMeshError, Result};
 pub use mesh::create_graph_dual;
 pub use option::Options;
 use std::result::Result as StdResult;
+pub use types::{Error, Idx, NewGraphError, NewMeshError, Real, Result};
 
 #[derive(Debug, PartialEq)]
 pub struct Graph<'a> {
@@ -65,9 +65,7 @@ impl<'a> Graph<'a> {
         }
         let last = xadj[num_vertices] as usize;
         if last != adjacency.len() {
-            return Err(NewGraphError::msg(
-                "xadj[n] must equal adjacency.len()",
-            ));
+            return Err(NewGraphError::msg("xadj[n] must equal adjacency.len()"));
         }
 
         // Validate adjacency values
@@ -264,7 +262,9 @@ impl<'a> Mesh<'a> {
             return Err(NewMeshError::NoParts);
         }
         if element_offsets.len() < 1 {
-            return Err(NewMeshError::msg("element_offsets must have at least one element"));
+            return Err(NewMeshError::msg(
+                "element_offsets must have at least one element",
+            ));
         }
 
         let ne = element_offsets.len() - 1;
@@ -286,13 +286,22 @@ impl<'a> Mesh<'a> {
         }
         let last = element_offsets[ne] as usize;
         if last != element_indices.len() {
-            return Err(NewMeshError::msg("element_offsets[ne] must equal element_indices.len()"));
+            return Err(NewMeshError::msg(
+                "element_offsets[ne] must equal element_indices.len()",
+            ));
         }
 
         // Compute nn (max node index + 1)
-        let nn = element_indices.iter().copied().max().map(|m| m + 1).unwrap_or(0);
+        let nn = element_indices
+            .iter()
+            .copied()
+            .max()
+            .map(|m| m + 1)
+            .unwrap_or(0);
         if nn < 0 {
-            return Err(NewMeshError::msg("negative node indices in element_indices"));
+            return Err(NewMeshError::msg(
+                "negative node indices in element_indices",
+            ));
         }
 
         Ok(Mesh {

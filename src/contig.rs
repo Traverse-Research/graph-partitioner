@@ -1,6 +1,6 @@
-use crate::types::Idx;
 use crate::ctrl::Control;
 use crate::graph::GraphData;
+use crate::types::Idx;
 
 /// Find connected components within each partition.
 pub fn find_partition_induced_components(

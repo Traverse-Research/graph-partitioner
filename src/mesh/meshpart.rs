@@ -1,9 +1,9 @@
-use crate::types::{Idx, Real, Result};
-use crate::Mesh;
 use crate::ctrl::Control;
 use crate::graph::setup::setup_graph;
-use crate::mesh::{create_graph_dual, build_node_element_csr};
+use crate::mesh::{build_node_element_csr, create_graph_dual};
 use crate::partition;
+use crate::types::{Idx, Real, Result};
+use crate::Mesh;
 
 /// Entry point for METIS_PartMeshDual logic.
 pub fn part_dual(mesh: Mesh, epart: &mut [Idx], npart: &mut [Idx]) -> Result<Idx> {
@@ -13,7 +13,13 @@ pub fn part_dual(mesh: Mesh, epart: &mut [Idx], npart: &mut [Idx]) -> Result<Idx
     let min_common_nodes = mesh.min_common_nodes;
 
     // Build dual graph
-    let (xadj, adjacency) = create_graph_dual(ne, nn, mesh.element_offsets, mesh.element_indices, min_common_nodes);
+    let (xadj, adjacency) = create_graph_dual(
+        ne,
+        nn,
+        mesh.element_offsets,
+        mesh.element_indices,
+        min_common_nodes,
+    );
 
     // Set up control (is_kway = true, matching C METIS which calls METIS_PartGraphKway)
     let mut ctrl = Control::new(&mesh.options, 1, nparts, true);
@@ -89,7 +95,9 @@ fn induce_row_part_from_column_part(
 
     // Setup integer target partition weights
     let itarget_part_weights: Vec<Idx> = if let Some(tp) = target_part_weights {
-        (0..nparts).map(|i| 1 + (nrows as Real * tp[i]) as Idx).collect()
+        (0..nparts)
+            .map(|i| 1 + (nrows as Real * tp[i]) as Idx)
+            .collect()
     } else {
         vec![1 + (nrows / nparts) as Idx; nparts]
     };
@@ -154,7 +162,8 @@ fn induce_row_part_from_column_part(
             for j in 0..nnbrs {
                 let nd = neighbor_partitions[j] as usize;
                 if part_weights[nd] < itarget_part_weights[nd]
-                    || (part_weights[nd] - itarget_part_weights[nd]) < (part_weights[pi] - itarget_part_weights[pi])
+                    || (part_weights[nd] - itarget_part_weights[nd])
+                        < (part_weights[pi] - itarget_part_weights[pi])
                 {
                     rpart[i] = neighbor_partitions[j];
                     break;

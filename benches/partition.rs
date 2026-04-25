@@ -1,9 +1,7 @@
 #[path = "../tests/fixtures.rs"]
 mod fixtures;
 
-use criterion::{
-    criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput,
-};
+use criterion::{criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion, Throughput};
 use fixtures::*;
 
 // ========= Graph k-way benchmarks =========
@@ -206,14 +204,7 @@ fn bench_tri_grid_100x100(c: &mut Criterion) {
 
 fn bench_tri_grid_300x300(c: &mut Criterion) {
     let (eptr, eind) = tri_grid_mesh(300, 300);
-    bench_mesh_dual(
-        c,
-        "tri_grid_300x300",
-        &eptr,
-        &eind,
-        &[4, 16, 64],
-        Some(10),
-    );
+    bench_mesh_dual(c, "tri_grid_300x300", &eptr, &eind, &[4, 16, 64], Some(10));
 }
 
 fn bench_sphere_64x128(c: &mut Criterion) {

@@ -43,7 +43,8 @@ pub fn create_graph_dual(
         nbrs.clear();
 
         // Slice the element's node indices for this element
-        let elem_nodes = &element_indices[element_offsets[i] as usize..element_offsets[i + 1] as usize];
+        let elem_nodes =
+            &element_indices[element_offsets[i] as usize..element_offsets[i + 1] as usize];
 
         // For each node of element i, find all elements sharing that node
         for &node_idx in elem_nodes {

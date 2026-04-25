@@ -1,7 +1,7 @@
-use crate::types::{Idx, Real};
 use crate::ctrl::Control;
 use crate::graph::{GraphData, KwayCutInfo};
 use crate::partition::kwayfm;
+use crate::types::{Idx, Real};
 
 const BOUNDARY_REFINE: Idx = 1;
 const BOUNDARY_BALANCE: Idx = 2;
@@ -139,14 +139,16 @@ pub fn compute_kway_partition_params(ctrl: &mut Control, graph: &mut GraphData, 
                     let mut found = false;
                     for k in 0..nnbrs as usize {
                         if ctrl.neighbor_pool[inbr as usize + k].part_id == other {
-                            ctrl.neighbor_pool[inbr as usize + k].external_degree += graph.edge_weights[j];
+                            ctrl.neighbor_pool[inbr as usize + k].external_degree +=
+                                graph.edge_weights[j];
                             found = true;
                             break;
                         }
                     }
                     if !found {
                         ctrl.neighbor_pool[inbr as usize + nnbrs as usize].part_id = other;
-                        ctrl.neighbor_pool[inbr as usize + nnbrs as usize].external_degree = graph.edge_weights[j];
+                        ctrl.neighbor_pool[inbr as usize + nnbrs as usize].external_degree =
+                            graph.edge_weights[j];
                         nnbrs += 1;
                     }
                 }
@@ -241,10 +243,12 @@ fn project_kway_partition(ctrl: &mut Control, finer: &mut GraphData, coarser: &G
                     if hk == -1 {
                         htable[other as usize] = nnbrs;
                         ctrl.neighbor_pool[inbr as usize + nnbrs as usize].part_id = other;
-                        ctrl.neighbor_pool[inbr as usize + nnbrs as usize].external_degree = finer.edge_weights[j];
+                        ctrl.neighbor_pool[inbr as usize + nnbrs as usize].external_degree =
+                            finer.edge_weights[j];
                         nnbrs += 1;
                     } else {
-                        ctrl.neighbor_pool[inbr as usize + hk as usize].external_degree += finer.edge_weights[j];
+                        ctrl.neighbor_pool[inbr as usize + hk as usize].external_degree +=
+                            finer.edge_weights[j];
                     }
                 }
             }
@@ -296,7 +300,11 @@ fn compute_kway_boundary(graph: &mut GraphData, _nparts: Idx, bndtype: Idx) {
 
     if bndtype == BOUNDARY_REFINE {
         for i in 0..num_vertices {
-            if graph.kway_refinement_info[i].external_degree > 0 && graph.kway_refinement_info[i].external_degree - graph.kway_refinement_info[i].internal_degree >= 0 {
+            if graph.kway_refinement_info[i].external_degree > 0
+                && graph.kway_refinement_info[i].external_degree
+                    - graph.kway_refinement_info[i].internal_degree
+                    >= 0
+            {
                 graph.boundary_list[num_boundary as usize] = i as Idx;
                 graph.boundary_map[i] = num_boundary;
                 num_boundary += 1;
@@ -320,7 +328,12 @@ fn compute_kway_boundary(graph: &mut GraphData, _nparts: Idx, bndtype: Idx) {
 ///
 /// Matches C METIS IsBalanced = (ComputeLoadImbalanceDiff <= ffactor).
 fn is_balanced(ctrl: &Control, graph: &GraphData, ffactor: Real) -> bool {
-    compute_load_imbalance_diff_kway(graph, ctrl.num_parts as usize, &ctrl.partition_ij_balance_multipliers, &ctrl.imbalance_tols) <= ffactor
+    compute_load_imbalance_diff_kway(
+        graph,
+        ctrl.num_parts as usize,
+        &ctrl.partition_ij_balance_multipliers,
+        &ctrl.imbalance_tols,
+    ) <= ffactor
 }
 
 /// ComputeLoadImbalanceDiff for k-way.
@@ -335,8 +348,12 @@ fn compute_load_imbalance_diff_kway(
     for i in 0..nparts {
         for j in 0..ncon {
             let idx = i * ncon + j;
-            if idx < graph.part_weights.len() && idx < partition_ij_balance_multipliers.len() && j < imbalance_tols.len() {
-                let diff = graph.part_weights[idx] as Real * partition_ij_balance_multipliers[idx] - imbalance_tols[j];
+            if idx < graph.part_weights.len()
+                && idx < partition_ij_balance_multipliers.len()
+                && j < imbalance_tols.len()
+            {
+                let diff = graph.part_weights[idx] as Real * partition_ij_balance_multipliers[idx]
+                    - imbalance_tols[j];
                 if diff > max_diff {
                     max_diff = diff;
                 }

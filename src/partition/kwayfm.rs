@@ -1,6 +1,6 @@
-use crate::types::{Idx, Real};
 use crate::ctrl::Control;
 use crate::graph::GraphData;
+use crate::types::{Idx, Real};
 use crate::util::pqueue::PQueue;
 
 const BOUNDARY_REFINE: Idx = 1;
@@ -14,7 +14,13 @@ const PQ_NOT_PRESENT: i8 = 3;
 
 #[expect(dead_code)]
 /// Greedy k-way optimization entry point.
-pub fn greedy_kway_optimize(ctrl: &mut Control, graph: &mut GraphData, niter: Idx, _ffactor: Real, omode: Idx) {
+pub fn greedy_kway_optimize(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    niter: Idx,
+    _ffactor: Real,
+    omode: Idx,
+) {
     greedy_kway_cut_optimize(ctrl, graph, niter, omode);
 }
 
@@ -27,7 +33,11 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
 
     let num_vertices = graph.num_vertices as usize;
     let nparts = ctrl.num_parts as usize;
-    let bndtype = if omode == MODE_REFINE { BOUNDARY_REFINE } else { BOUNDARY_BALANCE };
+    let bndtype = if omode == MODE_REFINE {
+        BOUNDARY_REFINE
+    } else {
+        BOUNDARY_BALANCE
+    };
 
     if num_vertices == 0 {
         return;
@@ -37,15 +47,19 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
     let ubfactor = if omode == MODE_BALANCE {
         ctrl.imbalance_tols[0]
     } else {
-        let cur_imbal = compute_load_imbalance_kway(graph, nparts, &ctrl.partition_ij_balance_multipliers);
+        let cur_imbal =
+            compute_load_imbalance_kway(graph, nparts, &ctrl.partition_ij_balance_multipliers);
         ctrl.imbalance_tols[0].max(cur_imbal)
     };
 
     let mut minpart_weights = vec![0 as Idx; nparts];
     let mut maxpart_weights = vec![0 as Idx; nparts];
     for i in 0..nparts {
-        maxpart_weights[i] = (ctrl.target_part_weights[i] * graph.total_vertex_weight[0] as Real * ubfactor) as Idx;
-        minpart_weights[i] = (ctrl.target_part_weights[i] * graph.total_vertex_weight[0] as Real * (1.0 / ubfactor)) as Idx;
+        maxpart_weights[i] =
+            (ctrl.target_part_weights[i] * graph.total_vertex_weight[0] as Real * ubfactor) as Idx;
+        minpart_weights[i] = (ctrl.target_part_weights[i]
+            * graph.total_vertex_weight[0] as Real
+            * (1.0 / ubfactor)) as Idx;
     }
 
     let mut perm = vec![0 as Idx; num_vertices];
@@ -59,7 +73,9 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
         if omode == MODE_BALANCE {
             let mut balanced = true;
             for i in 0..nparts {
-                if graph.part_weights[i] > maxpart_weights[i] || graph.part_weights[i] < minpart_weights[i] {
+                if graph.part_weights[i] > maxpart_weights[i]
+                    || graph.part_weights[i] < minpart_weights[i]
+                {
                     balanced = false;
                     break;
                 }
@@ -81,17 +97,27 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
         if num_boundary_usize > 0 {
             let nshuffles = num_boundary_usize / 4;
             if num_boundary_usize < 10 {
-                ctrl.rng.rand_array_permute(num_boundary_usize, &mut perm, 0, true);
+                ctrl.rng
+                    .rand_array_permute(num_boundary_usize, &mut perm, 0, true);
             } else {
-                ctrl.rng.rand_array_permute_with_nshuffles(num_boundary_usize, &mut perm, 0, nshuffles, true);
+                ctrl.rng.rand_array_permute_with_nshuffles(
+                    num_boundary_usize,
+                    &mut perm,
+                    0,
+                    nshuffles,
+                    true,
+                );
             }
         }
 
         for ii in 0..num_boundary_usize {
             let i = graph.boundary_list[perm[ii] as usize] as usize;
-            if i >= num_vertices { continue; }
+            if i >= num_vertices {
+                continue;
+            }
             let ckr = &graph.kway_refinement_info[i];
-            let scaled_gain = compute_kway_gain(ckr.external_degree, ckr.num_neighbors, ckr.internal_degree);
+            let scaled_gain =
+                compute_kway_gain(ckr.external_degree, ckr.num_neighbors, ckr.internal_degree);
             queue.insert(i as Idx, scaled_gain);
             vertex_status[i] = PQ_PRESENT;
             update_list[num_updates] = i as Idx;
@@ -123,14 +149,22 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
                 for kk in (0..ckr.num_neighbors as usize).rev() {
                     let nbr = &ctrl.neighbor_pool[inbr as usize + kk];
                     let to = nbr.part_id as usize;
-                    if to >= nparts { continue; }
+                    if to >= nparts {
+                        continue;
+                    }
                     if (nbr.external_degree > ckr.internal_degree
                         && (graph.part_weights[from] - vertex_weights >= minpart_weights[from]
-                            || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real) < (ctrl.target_part_weights[to] * (graph.part_weights[from] - vertex_weights) as Real))
+                            || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real)
+                                < (ctrl.target_part_weights[to]
+                                    * (graph.part_weights[from] - vertex_weights) as Real))
                         && (graph.part_weights[to] + vertex_weights <= maxpart_weights[to]
-                            || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real) < (ctrl.target_part_weights[to] * (graph.part_weights[from] - vertex_weights) as Real)))
+                            || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real)
+                                < (ctrl.target_part_weights[to]
+                                    * (graph.part_weights[from] - vertex_weights) as Real)))
                         || (nbr.external_degree == ckr.internal_degree
-                            && (ctrl.target_part_weights[from] * graph.part_weights[to] as Real) < (ctrl.target_part_weights[to] * (graph.part_weights[from] - vertex_weights) as Real))
+                            && (ctrl.target_part_weights[from] * graph.part_weights[to] as Real)
+                                < (ctrl.target_part_weights[to]
+                                    * (graph.part_weights[from] - vertex_weights) as Real))
                     {
                         best_k = kk as i32;
                         break;
@@ -144,15 +178,24 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
                 for jj in (0..bk).rev() {
                     let nbr_j = &ctrl.neighbor_pool[inbr as usize + jj];
                     let to = nbr_j.part_id as usize;
-                    if to >= nparts { continue; }
+                    if to >= nparts {
+                        continue;
+                    }
                     let nbr_k = &ctrl.neighbor_pool[inbr as usize + best_k as usize];
                     if (nbr_j.external_degree > nbr_k.external_degree
                         && (graph.part_weights[from] - vertex_weights >= minpart_weights[from]
-                            || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real) < (ctrl.target_part_weights[to] * (graph.part_weights[from] - vertex_weights) as Real))
+                            || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real)
+                                < (ctrl.target_part_weights[to]
+                                    * (graph.part_weights[from] - vertex_weights) as Real))
                         && (graph.part_weights[to] + vertex_weights <= maxpart_weights[to]
-                            || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real) < (ctrl.target_part_weights[to] * (graph.part_weights[from] - vertex_weights) as Real)))
+                            || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real)
+                                < (ctrl.target_part_weights[to]
+                                    * (graph.part_weights[from] - vertex_weights) as Real)))
                         || (nbr_j.external_degree == nbr_k.external_degree
-                            && (ctrl.target_part_weights[nbr_k.part_id as usize] * graph.part_weights[to] as Real) < (ctrl.target_part_weights[to] * graph.part_weights[nbr_k.part_id as usize] as Real))
+                            && (ctrl.target_part_weights[nbr_k.part_id as usize]
+                                * graph.part_weights[to] as Real)
+                                < (ctrl.target_part_weights[to]
+                                    * graph.part_weights[nbr_k.part_id as usize] as Real))
                     {
                         best_k = jj as i32;
                     }
@@ -162,9 +205,13 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
                 for kk in (0..ckr.num_neighbors as usize).rev() {
                     let nbr = &ctrl.neighbor_pool[inbr as usize + kk];
                     let to = nbr.part_id as usize;
-                    if to >= nparts { continue; }
+                    if to >= nparts {
+                        continue;
+                    }
                     if from >= nparts
-                        || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real) < (ctrl.target_part_weights[to] * (graph.part_weights[from] - vertex_weights) as Real)
+                        || (ctrl.target_part_weights[from] * graph.part_weights[to] as Real)
+                            < (ctrl.target_part_weights[to]
+                                * (graph.part_weights[from] - vertex_weights) as Real)
                     {
                         best_k = kk as i32;
                         break;
@@ -178,10 +225,14 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
                 for jj in (0..bk).rev() {
                     let nbr_j = &ctrl.neighbor_pool[inbr as usize + jj];
                     let to = nbr_j.part_id as usize;
-                    if to >= nparts { continue; }
+                    if to >= nparts {
+                        continue;
+                    }
                     let nbr_k = &ctrl.neighbor_pool[inbr as usize + best_k as usize];
-                    if (ctrl.target_part_weights[nbr_k.part_id as usize] * graph.part_weights[to] as Real)
-                        < (ctrl.target_part_weights[to] * graph.part_weights[nbr_k.part_id as usize] as Real)
+                    if (ctrl.target_part_weights[nbr_k.part_id as usize]
+                        * graph.part_weights[to] as Real)
+                        < (ctrl.target_part_weights[to]
+                            * graph.part_weights[nbr_k.part_id as usize] as Real)
                     {
                         best_k = jj as i32;
                     }
@@ -209,12 +260,26 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
                 let ewgt = graph.edge_weights[jj];
                 let old_nnbrs = graph.kway_refinement_info[ii].num_neighbors;
 
-                update_adjacent_vertex(ctrl, graph, ii, me, from, to, ewgt, &mut num_boundary, bndtype);
+                update_adjacent_vertex(
+                    ctrl,
+                    graph,
+                    ii,
+                    me,
+                    from,
+                    to,
+                    ewgt,
+                    &mut num_boundary,
+                    bndtype,
+                );
 
                 let new_nnbrs = graph.kway_refinement_info[ii].num_neighbors;
                 if me == to || me == from || old_nnbrs != new_nnbrs {
                     let ckr_ii = &graph.kway_refinement_info[ii];
-                    let scaled_gain = compute_kway_gain(ckr_ii.external_degree, ckr_ii.num_neighbors, ckr_ii.internal_degree);
+                    let scaled_gain = compute_kway_gain(
+                        ckr_ii.external_degree,
+                        ckr_ii.num_neighbors,
+                        ckr_ii.internal_degree,
+                    );
 
                     if bndtype == BOUNDARY_REFINE {
                         if vertex_status[ii] == PQ_PRESENT {
@@ -228,12 +293,15 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
                                     num_updates -= 1;
                                     update_list[pos] = update_list[num_updates];
                                     if (update_list[num_updates] as usize) < num_vertices {
-                                        update_index[update_list[num_updates] as usize] = pos as Idx;
+                                        update_index[update_list[num_updates] as usize] =
+                                            pos as Idx;
                                     }
                                     update_index[ii] = -1;
                                 }
                             }
-                        } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree - ckr_ii.internal_degree >= 0 {
+                        } else if vertex_status[ii] == PQ_NOT_PRESENT
+                            && ckr_ii.external_degree - ckr_ii.internal_degree >= 0
+                        {
                             queue.insert(ii as Idx, scaled_gain);
                             vertex_status[ii] = PQ_PRESENT;
                             update_list[num_updates] = ii as Idx;
@@ -252,12 +320,14 @@ pub fn greedy_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter
                                     num_updates -= 1;
                                     update_list[pos] = update_list[num_updates];
                                     if (update_list[num_updates] as usize) < num_vertices {
-                                        update_index[update_list[num_updates] as usize] = pos as Idx;
+                                        update_index[update_list[num_updates] as usize] =
+                                            pos as Idx;
                                     }
                                     update_index[ii] = -1;
                                 }
                             }
-                        } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree > 0 {
+                        } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree > 0
+                        {
                             queue.insert(ii as Idx, scaled_gain);
                             vertex_status[ii] = PQ_PRESENT;
                             update_list[num_updates] = ii as Idx;
@@ -300,7 +370,8 @@ fn update_moved_vertex(
     let ed_k = ctrl.neighbor_pool[inbr + k].external_degree;
 
     graph.partition[i] = to as Idx;
-    graph.kway_refinement_info[i].external_degree += graph.kway_refinement_info[i].internal_degree - ed_k;
+    graph.kway_refinement_info[i].external_degree +=
+        graph.kway_refinement_info[i].internal_degree - ed_k;
 
     let tmp = graph.kway_refinement_info[i].internal_degree;
     graph.kway_refinement_info[i].internal_degree = ed_k;
@@ -318,11 +389,19 @@ fn update_moved_vertex(
     }
 
     if bndtype == BOUNDARY_REFINE {
-        if graph.boundary_map[i] != -1 && graph.kway_refinement_info[i].external_degree - graph.kway_refinement_info[i].internal_degree < 0 {
+        if graph.boundary_map[i] != -1
+            && graph.kway_refinement_info[i].external_degree
+                - graph.kway_refinement_info[i].internal_degree
+                < 0
+        {
             graph.remove_from_boundary(i);
             *num_boundary -= 1;
         }
-        if graph.boundary_map[i] == -1 && graph.kway_refinement_info[i].external_degree - graph.kway_refinement_info[i].internal_degree >= 0 {
+        if graph.boundary_map[i] == -1
+            && graph.kway_refinement_info[i].external_degree
+                - graph.kway_refinement_info[i].internal_degree
+                >= 0
+        {
             graph.add_to_boundary(i);
             *num_boundary += 1;
         }
@@ -362,12 +441,17 @@ fn update_adjacent_vertex(
         graph.kway_refinement_info[vid].external_degree += ewgt;
         graph.kway_refinement_info[vid].internal_degree -= ewgt;
         if bndtype == BOUNDARY_REFINE {
-            if graph.kway_refinement_info[vid].external_degree - graph.kway_refinement_info[vid].internal_degree >= 0 && graph.boundary_map[vid] == -1 {
+            if graph.kway_refinement_info[vid].external_degree
+                - graph.kway_refinement_info[vid].internal_degree
+                >= 0
+                && graph.boundary_map[vid] == -1
+            {
                 graph.add_to_boundary(vid);
                 *num_boundary += 1;
             }
         } else {
-            if graph.kway_refinement_info[vid].external_degree > 0 && graph.boundary_map[vid] == -1 {
+            if graph.kway_refinement_info[vid].external_degree > 0 && graph.boundary_map[vid] == -1
+            {
                 graph.add_to_boundary(vid);
                 *num_boundary += 1;
             }
@@ -376,12 +460,17 @@ fn update_adjacent_vertex(
         graph.kway_refinement_info[vid].internal_degree += ewgt;
         graph.kway_refinement_info[vid].external_degree -= ewgt;
         if bndtype == BOUNDARY_REFINE {
-            if graph.kway_refinement_info[vid].external_degree - graph.kway_refinement_info[vid].internal_degree < 0 && graph.boundary_map[vid] != -1 {
+            if graph.kway_refinement_info[vid].external_degree
+                - graph.kway_refinement_info[vid].internal_degree
+                < 0
+                && graph.boundary_map[vid] != -1
+            {
                 graph.remove_from_boundary(vid);
                 *num_boundary -= 1;
             }
         } else {
-            if graph.kway_refinement_info[vid].external_degree <= 0 && graph.boundary_map[vid] != -1 {
+            if graph.kway_refinement_info[vid].external_degree <= 0 && graph.boundary_map[vid] != -1
+            {
                 graph.remove_from_boundary(vid);
                 *num_boundary -= 1;
             }
@@ -439,7 +528,11 @@ fn compute_kway_gain(ed: Idx, nnbrs: Idx, id: Idx) -> f64 {
     gain as f32 as f64
 }
 
-fn compute_load_imbalance_kway(graph: &GraphData, nparts: usize, partition_ij_balance_multipliers: &[Real]) -> Real {
+fn compute_load_imbalance_kway(
+    graph: &GraphData,
+    nparts: usize,
+    partition_ij_balance_multipliers: &[Real],
+) -> Real {
     let mut max_imbal: Real = 0.0;
     for i in 0..nparts {
         if i < graph.part_weights.len() && i < partition_ij_balance_multipliers.len() {
@@ -480,8 +573,12 @@ fn better_balance_kway(
     ncon: usize,
     vwgt: &[Idx],
     ubvec: &[Real],
-    a1: Idx, pt1: &[Idx], bm1: &[Real],
-    a2: Idx, pt2: &[Idx], bm2: &[Real],
+    a1: Idx,
+    pt1: &[Idx],
+    bm1: &[Real],
+    a2: Idx,
+    pt2: &[Idx],
+    bm2: &[Real],
 ) -> bool {
     let mut nrm1: Real = 0.0;
     let mut nrm2: Real = 0.0;
@@ -491,15 +588,23 @@ fn better_balance_kway(
     for i in 0..ncon {
         let tmp1 = bm1[i] * (pt1[i] + a1 * vwgt[i]) as Real - ubvec[i];
         nrm1 += tmp1 * tmp1;
-        if tmp1 > max1 { max1 = tmp1; }
+        if tmp1 > max1 {
+            max1 = tmp1;
+        }
 
         let tmp2 = bm2[i] * (pt2[i] + a2 * vwgt[i]) as Real - ubvec[i];
         nrm2 += tmp2 * tmp2;
-        if tmp2 > max2 { max2 = tmp2; }
+        if tmp2 > max2 {
+            max2 = tmp2;
+        }
     }
 
-    if max2 < max1 { return true; }
-    if max2 == max1 && nrm2 < nrm1 { return true; }
+    if max2 < max1 {
+        return true;
+    }
+    if max2 == max1 && nrm2 < nrm1 {
+        return true;
+    }
     false
 }
 
@@ -520,7 +625,12 @@ fn compute_load_imbalance_vec_kway(graph: &GraphData, nparts: usize, pijbm: &[Re
 }
 
 /// ComputeLoadImbalanceDiff for multi-constraint k-way.
-fn compute_load_imbalance_diff_mc(graph: &GraphData, nparts: usize, pijbm: &[Real], ubfactors: &[Real]) -> Real {
+fn compute_load_imbalance_diff_mc(
+    graph: &GraphData,
+    nparts: usize,
+    pijbm: &[Real],
+    ubfactors: &[Real],
+) -> Real {
     let ncon = graph.num_constraints as usize;
     let mut max_diff = Real::NEG_INFINITY;
     for i in 0..nparts {
@@ -543,7 +653,11 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
     let num_vertices = graph.num_vertices as usize;
     let nparts = ctrl.num_parts as usize;
     let ncon = graph.num_constraints as usize;
-    let bndtype = if omode == MODE_REFINE { BOUNDARY_REFINE } else { BOUNDARY_BALANCE };
+    let bndtype = if omode == MODE_REFINE {
+        BOUNDARY_REFINE
+    } else {
+        BOUNDARY_BALANCE
+    };
 
     if num_vertices == 0 {
         return;
@@ -570,8 +684,11 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
     for i in 0..nparts {
         for j in 0..ncon {
             let idx = i * ncon + j;
-            maxpwgts[idx] = (ctrl.target_part_weights[idx] * graph.total_vertex_weight[j] as Real * ubfactors[j]) as Idx;
-            minpwgts[idx] = (ctrl.target_part_weights[idx] * graph.total_vertex_weight[j] as Real * 0.2) as Idx;
+            maxpwgts[idx] = (ctrl.target_part_weights[idx]
+                * graph.total_vertex_weight[j] as Real
+                * ubfactors[j]) as Idx;
+            minpwgts[idx] =
+                (ctrl.target_part_weights[idx] * graph.total_vertex_weight[j] as Real * 0.2) as Idx;
         }
     }
 
@@ -602,17 +719,27 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
         if num_boundary_usize > 0 {
             let nshuffles = num_boundary_usize / 4;
             if num_boundary_usize < 10 {
-                ctrl.rng.rand_array_permute(num_boundary_usize, &mut perm, 0, true);
+                ctrl.rng
+                    .rand_array_permute(num_boundary_usize, &mut perm, 0, true);
             } else {
-                ctrl.rng.rand_array_permute_with_nshuffles(num_boundary_usize, &mut perm, 0, nshuffles, true);
+                ctrl.rng.rand_array_permute_with_nshuffles(
+                    num_boundary_usize,
+                    &mut perm,
+                    0,
+                    nshuffles,
+                    true,
+                );
             }
         }
 
         for ii in 0..num_boundary_usize {
             let i = graph.boundary_list[perm[ii] as usize] as usize;
-            if i >= num_vertices { continue; }
+            if i >= num_vertices {
+                continue;
+            }
             let ckr = &graph.kway_refinement_info[i];
-            let scaled_gain = compute_kway_gain(ckr.external_degree, ckr.num_neighbors, ckr.internal_degree);
+            let scaled_gain =
+                compute_kway_gain(ckr.external_degree, ckr.num_neighbors, ckr.internal_degree);
             queue.insert(i as Idx, scaled_gain);
             vertex_status[i] = PQ_PRESENT;
             update_list[num_updates] = i as Idx;
@@ -647,18 +774,25 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
             // Pre-move underbalance check
             if omode == MODE_REFINE {
                 if id_i > 0
-                    && !ivecaxpygez(ncon, -1, &vw,
+                    && !ivecaxpygez(
+                        ncon,
+                        -1,
+                        &vw,
                         &graph.part_weights[from_start..from_start + ncon],
-                        &minpwgts[from_start..from_start + ncon])
+                        &minpwgts[from_start..from_start + ncon],
+                    )
                 {
                     iii += 1;
                     continue;
                 }
             } else {
-                if !ivecaxpygez(ncon, -1, &vw,
+                if !ivecaxpygez(
+                    ncon,
+                    -1,
+                    &vw,
                     &graph.part_weights[from_start..from_start + ncon],
-                    &minpwgts[from_start..from_start + ncon])
-                {
+                    &minpwgts[from_start..from_start + ncon],
+                ) {
                     iii += 1;
                     continue;
                 }
@@ -671,12 +805,19 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                 // Find first valid candidate from the end
                 for kk in (0..nnbrs_i as usize).rev() {
                     let to = ctrl.neighbor_pool[inbr as usize + kk].part_id as usize;
-                    if to >= nparts { continue; }
+                    if to >= nparts {
+                        continue;
+                    }
                     let gain = ctrl.neighbor_pool[inbr as usize + kk].external_degree - id_i;
                     let to_start = to * ncon;
-                    if gain >= 0 && ivecaxpylez(ncon, 1, &vw,
-                        &graph.part_weights[to_start..to_start + ncon],
-                        &maxpwgts[to_start..to_start + ncon])
+                    if gain >= 0
+                        && ivecaxpylez(
+                            ncon,
+                            1,
+                            &vw,
+                            &graph.part_weights[to_start..to_start + ncon],
+                            &maxpwgts[to_start..to_start + ncon],
+                        )
                     {
                         best_k = kk as i32;
                         break;
@@ -691,18 +832,32 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                 let mut cto = ctrl.neighbor_pool[inbr as usize + best_k as usize].part_id as usize;
                 for jj in (0..best_k as usize).rev() {
                     let to = ctrl.neighbor_pool[inbr as usize + jj].part_id as usize;
-                    if to >= nparts { continue; }
+                    if to >= nparts {
+                        continue;
+                    }
                     let to_start = to * ncon;
                     let ed_j = ctrl.neighbor_pool[inbr as usize + jj].external_degree;
                     let ed_k = ctrl.neighbor_pool[inbr as usize + best_k as usize].external_degree;
                     if (ed_j > ed_k
-                        && ivecaxpylez(ncon, 1, &vw,
+                        && ivecaxpylez(
+                            ncon,
+                            1,
+                            &vw,
                             &graph.part_weights[to_start..to_start + ncon],
-                            &maxpwgts[to_start..to_start + ncon]))
-                       || (ed_j == ed_k
-                           && better_balance_kway(ncon, &vw, &ubfactors,
-                               1, &graph.part_weights[cto * ncon..(cto + 1) * ncon], &pijbm[cto * ncon..(cto + 1) * ncon],
-                               1, &graph.part_weights[to_start..to_start + ncon], &pijbm[to_start..to_start + ncon]))
+                            &maxpwgts[to_start..to_start + ncon],
+                        ))
+                        || (ed_j == ed_k
+                            && better_balance_kway(
+                                ncon,
+                                &vw,
+                                &ubfactors,
+                                1,
+                                &graph.part_weights[cto * ncon..(cto + 1) * ncon],
+                                &pijbm[cto * ncon..(cto + 1) * ncon],
+                                1,
+                                &graph.part_weights[to_start..to_start + ncon],
+                                &pijbm[to_start..to_start + ncon],
+                            ))
                     {
                         best_k = jj as i32;
                         cto = to;
@@ -711,17 +866,25 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                 final_to = cto;
 
                 // Final acceptance check
-                let gain = ctrl.neighbor_pool[inbr as usize + best_k as usize].external_degree - id_i;
+                let gain =
+                    ctrl.neighbor_pool[inbr as usize + best_k as usize].external_degree - id_i;
                 let to_start = final_to * ncon;
                 if !(gain > 0
                     || (gain == 0
-                        && (better_balance_kway(ncon, &vw, &ubfactors,
-                                -1, &graph.part_weights[from_start..from_start + ncon], &pijbm[from_start..from_start + ncon],
-                                1, &graph.part_weights[to_start..to_start + ncon], &pijbm[to_start..to_start + ncon])
-                            || (iii % 2 == 0) // safetos always 2 when no minconn
-                           )
-                       )
-                   )
+                        && (
+                            better_balance_kway(
+                                ncon,
+                                &vw,
+                                &ubfactors,
+                                -1,
+                                &graph.part_weights[from_start..from_start + ncon],
+                                &pijbm[from_start..from_start + ncon],
+                                1,
+                                &graph.part_weights[to_start..to_start + ncon],
+                                &pijbm[to_start..to_start + ncon],
+                            ) || (iii % 2 == 0)
+                            // safetos always 2 when no minconn
+                        )))
                 {
                     iii += 1;
                     continue;
@@ -730,15 +893,27 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                 // MODE_BALANCE
                 for kk in (0..nnbrs_i as usize).rev() {
                     let to = ctrl.neighbor_pool[inbr as usize + kk].part_id as usize;
-                    if to >= nparts { continue; }
+                    if to >= nparts {
+                        continue;
+                    }
                     let to_start = to * ncon;
-                    if ivecaxpylez(ncon, 1, &vw,
+                    if ivecaxpylez(
+                        ncon,
+                        1,
+                        &vw,
                         &graph.part_weights[to_start..to_start + ncon],
-                        &maxpwgts[to_start..to_start + ncon])
-                       || better_balance_kway(ncon, &vw, &ubfactors,
-                            -1, &graph.part_weights[from_start..from_start + ncon], &pijbm[from_start..from_start + ncon],
-                            1, &graph.part_weights[to_start..to_start + ncon], &pijbm[to_start..to_start + ncon])
-                    {
+                        &maxpwgts[to_start..to_start + ncon],
+                    ) || better_balance_kway(
+                        ncon,
+                        &vw,
+                        &ubfactors,
+                        -1,
+                        &graph.part_weights[from_start..from_start + ncon],
+                        &pijbm[from_start..from_start + ncon],
+                        1,
+                        &graph.part_weights[to_start..to_start + ncon],
+                        &pijbm[to_start..to_start + ncon],
+                    ) {
                         best_k = kk as i32;
                         break;
                     }
@@ -751,12 +926,21 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                 let mut cto = ctrl.neighbor_pool[inbr as usize + best_k as usize].part_id as usize;
                 for jj in (0..best_k as usize).rev() {
                     let to = ctrl.neighbor_pool[inbr as usize + jj].part_id as usize;
-                    if to >= nparts { continue; }
+                    if to >= nparts {
+                        continue;
+                    }
                     let to_start = to * ncon;
-                    if better_balance_kway(ncon, &vw, &ubfactors,
-                        1, &graph.part_weights[cto * ncon..(cto + 1) * ncon], &pijbm[cto * ncon..(cto + 1) * ncon],
-                        1, &graph.part_weights[to_start..to_start + ncon], &pijbm[to_start..to_start + ncon])
-                    {
+                    if better_balance_kway(
+                        ncon,
+                        &vw,
+                        &ubfactors,
+                        1,
+                        &graph.part_weights[cto * ncon..(cto + 1) * ncon],
+                        &pijbm[cto * ncon..(cto + 1) * ncon],
+                        1,
+                        &graph.part_weights[to_start..to_start + ncon],
+                        &pijbm[to_start..to_start + ncon],
+                    ) {
                         best_k = jj as i32;
                         cto = to;
                     }
@@ -764,12 +948,21 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                 final_to = cto;
 
                 // Final acceptance: if gain < 0, require BetterBalance
-                let gain = ctrl.neighbor_pool[inbr as usize + best_k as usize].external_degree - id_i;
+                let gain =
+                    ctrl.neighbor_pool[inbr as usize + best_k as usize].external_degree - id_i;
                 let to_start = final_to * ncon;
                 if gain < 0
-                    && !better_balance_kway(ncon, &vw, &ubfactors,
-                        -1, &graph.part_weights[from_start..from_start + ncon], &pijbm[from_start..from_start + ncon],
-                        1, &graph.part_weights[to_start..to_start + ncon], &pijbm[to_start..to_start + ncon])
+                    && !better_balance_kway(
+                        ncon,
+                        &vw,
+                        &ubfactors,
+                        -1,
+                        &graph.part_weights[from_start..from_start + ncon],
+                        &pijbm[from_start..from_start + ncon],
+                        1,
+                        &graph.part_weights[to_start..to_start + ncon],
+                        &pijbm[to_start..to_start + ncon],
+                    )
                 {
                     iii += 1;
                     continue;
@@ -802,12 +995,26 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                 let ewgt = graph.edge_weights[jj];
                 let old_nnbrs = graph.kway_refinement_info[ii].num_neighbors;
 
-                update_adjacent_vertex(ctrl, graph, ii, me, from, to, ewgt, &mut num_boundary, bndtype);
+                update_adjacent_vertex(
+                    ctrl,
+                    graph,
+                    ii,
+                    me,
+                    from,
+                    to,
+                    ewgt,
+                    &mut num_boundary,
+                    bndtype,
+                );
 
                 let new_nnbrs = graph.kway_refinement_info[ii].num_neighbors;
                 if me == to || me == from || old_nnbrs != new_nnbrs {
                     let ckr_ii = &graph.kway_refinement_info[ii];
-                    let scaled_gain = compute_kway_gain(ckr_ii.external_degree, ckr_ii.num_neighbors, ckr_ii.internal_degree);
+                    let scaled_gain = compute_kway_gain(
+                        ckr_ii.external_degree,
+                        ckr_ii.num_neighbors,
+                        ckr_ii.internal_degree,
+                    );
 
                     if bndtype == BOUNDARY_REFINE {
                         if vertex_status[ii] == PQ_PRESENT {
@@ -821,12 +1028,15 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                                     num_updates -= 1;
                                     update_list[pos] = update_list[num_updates];
                                     if (update_list[num_updates] as usize) < num_vertices {
-                                        update_index[update_list[num_updates] as usize] = pos as Idx;
+                                        update_index[update_list[num_updates] as usize] =
+                                            pos as Idx;
                                     }
                                     update_index[ii] = -1;
                                 }
                             }
-                        } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree - ckr_ii.internal_degree >= 0 {
+                        } else if vertex_status[ii] == PQ_NOT_PRESENT
+                            && ckr_ii.external_degree - ckr_ii.internal_degree >= 0
+                        {
                             queue.insert(ii as Idx, scaled_gain);
                             vertex_status[ii] = PQ_PRESENT;
                             update_list[num_updates] = ii as Idx;
@@ -845,12 +1055,14 @@ fn greedy_mc_kway_cut_optimize(ctrl: &mut Control, graph: &mut GraphData, niter:
                                     num_updates -= 1;
                                     update_list[pos] = update_list[num_updates];
                                     if (update_list[num_updates] as usize) < num_vertices {
-                                        update_index[update_list[num_updates] as usize] = pos as Idx;
+                                        update_index[update_list[num_updates] as usize] =
+                                            pos as Idx;
                                     }
                                     update_index[ii] = -1;
                                 }
                             }
-                        } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree > 0 {
+                        } else if vertex_status[ii] == PQ_NOT_PRESENT && ckr_ii.external_degree > 0
+                        {
                             queue.insert(ii as Idx, scaled_gain);
                             vertex_status[ii] = PQ_PRESENT;
                             update_list[num_updates] = ii as Idx;

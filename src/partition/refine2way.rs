@@ -1,9 +1,9 @@
-use crate::types::{Idx, Real};
 use crate::ctrl::Control;
 use crate::graph::GraphData;
-use crate::partition::fm::fm_2way_refine;
 use crate::partition::balance::balance_2way;
+use crate::partition::fm::fm_2way_refine;
 use crate::partition::initpart::compute_2way_partition_params;
+use crate::types::{Idx, Real};
 
 /// Refine2Way: refine the 2-way partition through the entire coarsening chain.
 ///
@@ -12,7 +12,12 @@ use crate::partition::initpart::compute_2way_partition_params;
 /// (where initial partitioning was performed).
 ///
 /// Walks from coarsest to finest: Balance -> FM refine -> project to finer.
-pub fn refine_2way(ctrl: &mut Control, graph: &mut GraphData, levels: &mut Vec<GraphData>, target_part_weights: &[Real]) {
+pub fn refine_2way(
+    ctrl: &mut Control,
+    graph: &mut GraphData,
+    levels: &mut Vec<GraphData>,
+    target_part_weights: &[Real],
+) {
     let niter = ctrl.num_iter;
     let nlevels = levels.len(); // number of coarser levels
 

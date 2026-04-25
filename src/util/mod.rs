@@ -1,7 +1,7 @@
 pub mod pqueue;
 
-use crate::types::{Idx, Real};
 use crate::graph::GraphData;
+use crate::types::{Idx, Real};
 
 #[expect(dead_code)]
 /// Return the index of the maximum element.

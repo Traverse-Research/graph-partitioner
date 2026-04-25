@@ -1,6 +1,6 @@
-use crate::types::Idx;
-use crate::graph::GraphData;
 use crate::graph::setup::setup_graph_total_vertex_weight;
+use crate::graph::GraphData;
+use crate::types::Idx;
 
 /// Split a bisected graph into two subgraphs based on partition[i] == 0 or 1.
 pub fn split_graph_part(graph: &GraphData) -> (GraphData, GraphData) {
@@ -53,7 +53,8 @@ pub fn split_graph_part(graph: &GraphData) -> (GraphData, GraphData) {
             llabel[li] = graph.label[i];
 
             let adj_slice = &graph.adjacency[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
-            let ewgt_slice = &graph.edge_weights[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
+            let ewgt_slice =
+                &graph.edge_weights[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
             for (&nbr_idx, &ew) in adj_slice.iter().zip(ewgt_slice) {
                 let nbr = nbr_idx as usize;
                 if graph.partition[nbr] == 0 {
@@ -71,7 +72,8 @@ pub fn split_graph_part(graph: &GraphData) -> (GraphData, GraphData) {
             rlabel[ri] = graph.label[i];
 
             let adj_slice = &graph.adjacency[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
-            let ewgt_slice = &graph.edge_weights[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
+            let ewgt_slice =
+                &graph.edge_weights[graph.xadj[i] as usize..graph.xadj[i + 1] as usize];
             for (&nbr_idx, &ew) in adj_slice.iter().zip(ewgt_slice) {
                 let nbr = nbr_idx as usize;
                 if graph.partition[nbr] == 1 {

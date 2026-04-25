@@ -1,8 +1,8 @@
-use crate::types::{Idx, Result};
-use crate::Graph;
 use crate::ctrl::Control;
 use crate::graph::setup::setup_graph;
 use crate::partition::pmetis::mlevel_recursive_bisection;
+use crate::types::{Idx, Result};
+use crate::Graph;
 
 /// Entry point for METIS_PartGraphRecursive logic.
 ///

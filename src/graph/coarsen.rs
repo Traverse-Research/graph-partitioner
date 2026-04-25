@@ -1,7 +1,7 @@
-use crate::types::Idx;
 use crate::ctrl::Control;
-use crate::graph::GraphData;
 use crate::graph::contract;
+use crate::graph::GraphData;
+use crate::types::Idx;
 
 const COARSEN_FRACTION: f64 = 0.85;
 const UNMATCHED: Idx = -1;
@@ -26,7 +26,8 @@ pub fn coarsen_graph(ctrl: &mut Control, graph: &mut GraphData) -> Vec<GraphData
 
     // Compute max_vertex_weight: 1.5 * total_vertex_weight[i] / CoarsenTo
     for i in 0..ncon {
-        ctrl.max_vertex_weight[i] = ((1.5 * graph.total_vertex_weight[i] as f64) / ctrl.coarsen_to.max(1) as f64) as Idx;
+        ctrl.max_vertex_weight[i] =
+            ((1.5 * graph.total_vertex_weight[i] as f64) / ctrl.coarsen_to.max(1) as f64) as Idx;
     }
 
     let mut levels: Vec<GraphData> = Vec::new();
@@ -46,8 +47,7 @@ pub fn coarsen_graph(ctrl: &mut Control, graph: &mut GraphData) -> Vec<GraphData
         let cnum_vertices = graph.coarse_map.iter().copied().max().unwrap_or(-1) + 1;
         let coarse = contract::create_coarse_graph(ctrl, graph, cnum_vertices);
 
-        let continue_coarsening =
-            coarse.num_vertices > ctrl.coarsen_to
+        let continue_coarsening = coarse.num_vertices > ctrl.coarsen_to
             && (coarse.num_vertices as f64) < COARSEN_FRACTION * graph.num_vertices as f64
             && coarse.num_edges > coarse.num_vertices / 2;
 
@@ -74,8 +74,7 @@ pub fn coarsen_graph(ctrl: &mut Control, graph: &mut GraphData) -> Vec<GraphData
         let cnum_vertices = g.coarse_map.iter().copied().max().unwrap_or(-1) + 1;
         let coarse = contract::create_coarse_graph(ctrl, g, cnum_vertices);
 
-        let continue_coarsening =
-            coarse.num_vertices > ctrl.coarsen_to
+        let continue_coarsening = coarse.num_vertices > ctrl.coarsen_to
             && (coarse.num_vertices as f64) < COARSEN_FRACTION * g.num_vertices as f64
             && coarse.num_edges > coarse.num_vertices / 2;
 
@@ -101,7 +100,8 @@ fn matchingshem(ctrl: &mut Control, graph: &mut GraphData) {
     // Create degree-biased random permutation
     // Step 1: random permutation of tperm
     let nshuffles = num_vertices / 8;
-    ctrl.rng.rand_array_permute_with_nshuffles(num_vertices, &mut tperm, 0, nshuffles, true);
+    ctrl.rng
+        .rand_array_permute_with_nshuffles(num_vertices, &mut tperm, 0, nshuffles, true);
 
     // Step 2: degree-based bucket sort
     // C METIS: avgdegree = 4.0*(xadj[num_vertices]/num_vertices) — integer division first
@@ -141,14 +141,16 @@ fn matchingshem(ctrl: &mut Control, graph: &mut GraphData) {
                 at_max = true;
             }
         } else {
-            at_max = (0..ncon).all(|j| graph.vertex_weights[i * ncon + j] >= ctrl.max_vertex_weight[j]);
+            at_max =
+                (0..ncon).all(|j| graph.vertex_weights[i * ncon + j] >= ctrl.max_vertex_weight[j]);
         }
 
         if at_max {
             // Self-match
         } else if graph.xadj[i] == graph.xadj[i + 1] {
             // Island vertex: find another unmatched vertex
-            maxidx = find_island_partner(&perm, &matching, &mut last_unmatched, num_vertices, i) as i64;
+            maxidx =
+                find_island_partner(&perm, &matching, &mut last_unmatched, num_vertices, i) as i64;
         } else {
             // SHEM: find heaviest unmatched neighbor
             let mut maxwgt: Idx = -1;
@@ -212,7 +214,14 @@ fn matchingshem(ctrl: &mut Control, graph: &mut GraphData) {
 
     // 2-hop matching
     if !ctrl.disable_2hop && nunmatched as f64 > UNMATCHED_THRESHOLD_2HOP * num_vertices as f64 {
-        matching2hop(ctrl, graph, &perm, &mut matching, &mut cnum_vertices, &mut nunmatched);
+        matching2hop(
+            ctrl,
+            graph,
+            &perm,
+            &mut matching,
+            &mut cnum_vertices,
+            &mut nunmatched,
+        );
     }
 
     // Final renumbering: assign sequential coarse vertex IDs
@@ -242,7 +251,8 @@ fn matchingrm(ctrl: &mut Control, graph: &mut GraphData) {
     let mut tperm = vec![0 as Idx; num_vertices];
 
     let nshuffles = num_vertices / 8;
-    ctrl.rng.rand_array_permute_with_nshuffles(num_vertices, &mut tperm, 0, nshuffles, true);
+    ctrl.rng
+        .rand_array_permute_with_nshuffles(num_vertices, &mut tperm, 0, nshuffles, true);
 
     // C METIS: avgdegree = 4.0*(xadj[num_vertices]/num_vertices) — integer division first
     let avgdegree = if num_vertices > 0 && graph.num_edges > 0 {
@@ -278,13 +288,15 @@ fn matchingrm(ctrl: &mut Control, graph: &mut GraphData) {
                 at_max = true;
             }
         } else {
-            at_max = (0..ncon).all(|j| graph.vertex_weights[i * ncon + j] >= ctrl.max_vertex_weight[j]);
+            at_max =
+                (0..ncon).all(|j| graph.vertex_weights[i * ncon + j] >= ctrl.max_vertex_weight[j]);
         }
 
         if at_max {
             // Self-match
         } else if graph.xadj[i] == graph.xadj[i + 1] {
-            maxidx = find_island_partner(&perm, &matching, &mut last_unmatched, num_vertices, i) as i64;
+            maxidx =
+                find_island_partner(&perm, &matching, &mut last_unmatched, num_vertices, i) as i64;
         } else {
             // RM: find first valid unmatched neighbor
             maxidx = -1;
@@ -298,9 +310,7 @@ fn matchingrm(ctrl: &mut Control, graph: &mut GraphData) {
                 let vw_i = graph.vertex_weights[i];
                 for a in adj_slice {
                     let j = *a as usize;
-                    if matching[j] == UNMATCHED
-                        && vw_i + graph.vertex_weights[j] <= max_vw0
-                    {
+                    if matching[j] == UNMATCHED && vw_i + graph.vertex_weights[j] <= max_vw0 {
                         maxidx = j as i64;
                         break;
                     }
@@ -342,7 +352,14 @@ fn matchingrm(ctrl: &mut Control, graph: &mut GraphData) {
     }
 
     if !ctrl.disable_2hop && nunmatched as f64 > UNMATCHED_THRESHOLD_2HOP * num_vertices as f64 {
-        matching2hop(ctrl, graph, &perm, &mut matching, &mut cnum_vertices, &mut nunmatched);
+        matching2hop(
+            ctrl,
+            graph,
+            &perm,
+            &mut matching,
+            &mut cnum_vertices,
+            &mut nunmatched,
+        );
     }
 
     let mut new_cnum_vertices: Idx = 0;
@@ -397,7 +414,14 @@ fn matching2hop(
         matching2hop_any(graph, perm, matching, cnum_vertices, nunmatched, 3);
     }
     if *nunmatched as f64 > 2.0 * UNMATCHED_THRESHOLD_2HOP * num_vertices as f64 {
-        matching2hop_any(graph, perm, matching, cnum_vertices, nunmatched, num_vertices);
+        matching2hop_any(
+            graph,
+            perm,
+            matching,
+            cnum_vertices,
+            nunmatched,
+            num_vertices,
+        );
     }
 }
 
@@ -506,9 +530,16 @@ fn matching2hop_all(
     let num_vertices = graph.num_vertices as usize;
 
     // Collect candidates with degree > 1 and < maxdegree
-    struct KeyVal { key: Idx, val: Idx }
+    struct KeyVal {
+        key: Idx,
+        val: Idx,
+    }
     let mut cands: Vec<KeyVal> = Vec::new();
-    let mask = if maxdegree > 0 { Idx::MAX / maxdegree as Idx } else { 1 };
+    let mask = if maxdegree > 0 {
+        Idx::MAX / maxdegree as Idx
+    } else {
+        1
+    };
 
     for pi in 0..num_vertices {
         let i = perm[pi] as usize;
@@ -594,7 +625,13 @@ fn matching2hop_all(
 
 /// Check that vertex_weights[i*ncon..] + vertex_weights[j*ncon..] <= max_vertex_weight[..] for all constraints.
 #[inline(always)]
-fn ivec_le_sum(ncon: usize, vertex_weights: &[Idx], i: usize, j: usize, max_vertex_weight: &[Idx]) -> bool {
+fn ivec_le_sum(
+    ncon: usize,
+    vertex_weights: &[Idx],
+    i: usize,
+    j: usize,
+    max_vertex_weight: &[Idx],
+) -> bool {
     for k in 0..ncon {
         if vertex_weights[i * ncon + k] + vertex_weights[j * ncon + k] > max_vertex_weight[k] {
             return false;

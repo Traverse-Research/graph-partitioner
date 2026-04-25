@@ -1,6 +1,6 @@
-pub mod setup;
 pub mod coarsen;
 pub mod contract;
+pub mod setup;
 
 use crate::types::{Idx, Real};
 
@@ -54,9 +54,9 @@ pub struct GraphData {
     // (Multi-level chain managed externally via Vec<GraphData>)
 
     // Graph-level metadata
-    pub total_vertex_weight: Vec<Idx>,     // total vertex weight per constraint
+    pub total_vertex_weight: Vec<Idx>, // total vertex weight per constraint
     pub inv_total_vertex_weight: Vec<Real>, // 1.0 / total_vertex_weight
-    pub label: Vec<Idx>,     // original vertex labels (for recursive bisection)
+    pub label: Vec<Idx>,               // original vertex labels (for recursive bisection)
 }
 
 impl GraphData {

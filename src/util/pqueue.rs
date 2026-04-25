@@ -252,15 +252,20 @@ mod tests {
 
         // Should extract in descending order of keys
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(n, 3); assert_eq!(k, 7.0);
+        assert_eq!(n, 3);
+        assert_eq!(k, 7.0);
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(n, 1); assert_eq!(k, 5.0);
+        assert_eq!(n, 1);
+        assert_eq!(k, 5.0);
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(n, 2); assert_eq!(k, 3.0);
+        assert_eq!(n, 2);
+        assert_eq!(k, 3.0);
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(n, 4); assert_eq!(k, 2.0);
+        assert_eq!(n, 4);
+        assert_eq!(k, 2.0);
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(n, 0); assert_eq!(k, 1.0);
+        assert_eq!(n, 0);
+        assert_eq!(k, 1.0);
         assert!(pq.get_top().is_none());
     }
 
@@ -501,7 +506,10 @@ mod tests {
         // Keys should be in same descending order
         let keys_update: Vec<f64> = order_update.iter().map(|&(_, k)| k).collect();
         let keys_reinsert: Vec<f64> = order_reinsert.iter().map(|&(_, k)| k).collect();
-        assert_eq!(keys_update, keys_reinsert, "Keys should be extracted in same order");
+        assert_eq!(
+            keys_update, keys_reinsert,
+            "Keys should be extracted in same order"
+        );
     }
 
     /// Test that the heap structure after in-place update matches what
@@ -794,15 +802,20 @@ mod tests {
 
         // Extract order should be: 10, 9, 8, 6, 2
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(k, 10.0); assert_eq!(n, 0);
+        assert_eq!(k, 10.0);
+        assert_eq!(n, 0);
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(k, 9.0); assert_eq!(n, 3);
+        assert_eq!(k, 9.0);
+        assert_eq!(n, 3);
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(k, 8.0); assert_eq!(n, 1);
+        assert_eq!(k, 8.0);
+        assert_eq!(n, 1);
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(k, 6.0); assert_eq!(n, 2);
+        assert_eq!(k, 6.0);
+        assert_eq!(n, 2);
         let (n, k) = pq.get_top().unwrap();
-        assert_eq!(k, 2.0); assert_eq!(n, 4);
+        assert_eq!(k, 2.0);
+        assert_eq!(n, 4);
     }
 
     /// Replicate the FM refinement scenario where update vs delete+insert
@@ -814,8 +827,16 @@ mod tests {
 
         // Simulate FM: insert boundary vertices with their gains
         let gains = [
-            (0, 2.0), (1, -1.0), (2, 4.0), (3, 0.0), (4, -3.0),
-            (5, 1.0), (6, 3.0), (7, -2.0), (8, 5.0), (9, 0.0),
+            (0, 2.0),
+            (1, -1.0),
+            (2, 4.0),
+            (3, 0.0),
+            (4, -3.0),
+            (5, 1.0),
+            (6, 3.0),
+            (7, -2.0),
+            (8, 5.0),
+            (9, 0.0),
         ];
         for &(node, gain) in &gains {
             pq.insert(node, gain);
@@ -826,8 +847,8 @@ mod tests {
         assert_eq!(best, 8); // gain 5.0
 
         // Update neighbors' gains (simulating FM neighbor update)
-        pq.update(2, 2.0);  // was 4.0, decreased
-        pq.update(6, 5.0);  // was 3.0, increased
+        pq.update(2, 2.0); // was 4.0, decreased
+        pq.update(6, 5.0); // was 3.0, increased
         pq.update(0, -1.0); // was 2.0, decreased
         assert!(pq.verify_heap_invariant());
         assert!(pq.verify_locator_consistency());
