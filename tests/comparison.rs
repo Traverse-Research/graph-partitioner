@@ -543,3 +543,13 @@ fn compare_recursive_meshlet_grid_dual_450t_4p() {
         compare_part_recursive(&xadj, &adjacency, 4, seed);
     }
 }
+
+#[test]
+fn compare_recursive_meshlet_grid_dual_247t_2p() {
+    // Second connected component of the same 16×16 quad-grid mesh as
+    // `compare_recursive_meshlet_grid_dual_450t_4p`. 247 elements / 2 parts.
+    let (xadj, adjacency) = meshlet_grid_dual_247t_2p();
+    for &seed in &[42, 0, 12345] {
+        compare_part_recursive(&xadj, &adjacency, 2, seed);
+    }
+}
