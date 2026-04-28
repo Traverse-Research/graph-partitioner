@@ -30,7 +30,9 @@ pub fn coarsen_graph(ctrl: &mut Control, graph: &mut GraphData) -> Vec<GraphData
             ((1.5 * graph.total_vertex_weight[i] as f64) / ctrl.coarsen_to.max(1) as f64) as Idx;
     }
 
-    let mut levels: Vec<GraphData> = Vec::new();
+    // Multilevel coarsening typically produces 5-15 levels; pre-size to skip the
+    // doubling reallocations (and the GraphData moves they entail) on the way up.
+    let mut levels: Vec<GraphData> = Vec::with_capacity(16);
     let mut cur_eqewgts = eqewgts;
 
     // First iteration: match and coarsen the finest graph
